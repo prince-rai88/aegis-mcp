@@ -2,6 +2,13 @@
     "version": "1.0.0",
     "widgets": [
         {
+            "uri": "/",
+            "name": "Dashboard",
+            "description": "Aegis Security platform dashboard",
+            "examples": [],
+            "tags": ["dashboard", "home", "aegis"]
+        },
+        {
             "uri": "/capability-graph",
             "name": "Capability Risk Graph",
             "description": "Interactive 3-lane visualization of agent → tool → capability relationships. Dangerous edges glow red and attack paths can be remediated in-place.",
