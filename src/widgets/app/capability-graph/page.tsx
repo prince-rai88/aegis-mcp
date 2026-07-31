@@ -4,19 +4,20 @@ export const dynamic = 'force-dynamic';
 
 import { useWidgetSDK, useTheme } from '@nitrostack/widgets';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface GraphNode  { id: string; type: 'agent' | 'tool' | 'capability'; label: string; }
 interface GraphEdge  { id: string; source: string; target: string; danger: boolean; }
 interface AttackPath { ruleId: string; source: string; sink: string; viaTools: string[]; severity: 'critical' | 'high' | 'medium'; message: string; }
 interface CapabilityGraphData { agentId: string; nodes: GraphNode[]; edges: GraphEdge[]; attackPaths: AttackPath[]; riskScore: number; }
 
-const TOOL_META: Record<string, { emoji: string; color: string; bg: string }> = {
-    gmail:      { emoji: '📧', color: '#ea4335', bg: 'rgba(234,67,53,0.12)'  },
-    dropbox:    { emoji: '📦', color: '#0061ff', bg: 'rgba(0,97,255,0.12)'   },
-    postgres:   { emoji: '🐘', color: '#336791', bg: 'rgba(51,103,145,0.12)' },
-    slack:      { emoji: '💬', color: '#a855f7', bg: 'rgba(168,85,247,0.12)' },
-    filesystem: { emoji: '🗂️', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-    calendar:   { emoji: '📅', color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+const TOOL_META: Record<string, { emoji: string; color: string }> = {
+    gmail:      { emoji: '📧', color: '#ea4335' },
+    dropbox:    { emoji: '📦', color: '#0061ff' },
+    postgres:   { emoji: '🐘', color: '#336791' },
+    slack:      { emoji: '💬', color: '#a855f7' },
+    filesystem: { emoji: '🗂️', color: '#f59e0b' },
+    calendar:   { emoji: '📅', color: '#10b981' },
 };
 
 const CAP_ICONS: Record<string, string> = {
@@ -46,27 +47,30 @@ export default function CapabilityGraphWidget() {
         } finally { setApplying(null); }
     };
 
-    const bg     = isDark ? '#060b14' : '#f0f4f8';
-    const card   = isDark ? 'rgba(15,23,42,0.82)'  : 'rgba(255,255,255,0.92)';
-    const border = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
-    const text   = isDark ? '#f0f9ff' : '#0f172a';
-    const sub    = isDark ? '#64748b' : '#94a3b8';
-    const lane   = isDark ? 'rgba(15,23,42,0.45)' : 'rgba(248,250,252,0.9)';
+    const bg     = isDark ? '#020617' : '#f8fafc';
+    const card   = isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.8)';
+    const border = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+    const text   = isDark ? '#f8fafc' : '#0f172a';
+    const sub    = isDark ? '#94a3b8' : '#64748b';
+    const inset  = isDark ? 'inset 0 1px 0 rgba(255,255,255,0.06)' : 'inset 0 1px 0 rgba(255,255,255,1)';
+    const laneBg = isDark ? 'rgba(15,23,42,0.3)' : 'rgba(241,245,249,0.5)';
 
     if (!isReady || !data) {
         return (
-            <div style={{ background:bg, minHeight:400, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, fontFamily:'Inter, system-ui, sans-serif' }}>
-                <div style={{ width:52, height:52, border:`3px solid ${isDark ? '#1e3a5f' : '#bfdbfe'}`, borderTopColor:'#3b82f6', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
-                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-                <p style={{ color:sub, fontSize:14, margin:0 }}>Loading capability graph…</p>
+            <div style={{ background:bg, minHeight:500, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:20, fontFamily:'Inter, system-ui, sans-serif' }}>
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    style={{ width: 44, height: 44, border: `3px solid ${border}`, borderTopColor: '#3b82f6', borderRadius: '50%' }}
+                />
+                <motion.p animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }} style={{ color:sub, fontSize:14, fontWeight:500, margin:0 }}>
+                    Compiling capability matrix...
+                </motion.p>
             </div>
         );
     }
 
     const riskPct   = Math.round(data.riskScore * 100);
     const riskColor = riskPct === 0 ? '#10b981' : riskPct < 60 ? '#f97316' : '#ef4444';
-    const riskLabel = riskPct === 0 ? 'Secure' : riskPct < 40 ? 'Low Risk' : riskPct < 70 ? 'High Risk' : 'Critical';
-
+    
     const toolNodes  = data.nodes.filter(n => n.type === 'tool');
     const capNodes   = data.nodes.filter(n => n.type === 'capability');
     const agentNode  = data.nodes.find(n => n.type === 'agent');
@@ -79,327 +83,204 @@ export default function CapabilityGraphWidget() {
 
     const hovPathObj = hovPath ? data.attackPaths.find(p => p.ruleId === hovPath) : null;
     const hovToolIds = new Set(hovPathObj?.viaTools.map(t => `tool:${t}`) ?? []);
-    const hovCapIds  = new Set([
-        ...(hovPathObj ? data.edges.filter(e => hovToolIds.has(e.source)).map(e => e.target) : [])
-    ]);
+    const hovCapIds  = new Set([ ...(hovPathObj ? data.edges.filter(e => hovToolIds.has(e.source)).map(e => e.target) : []) ]);
+
+    const laneVariants = { hidden: { opacity: 0, x: -20 }, show: { opacity: 1, x: 0, transition: { staggerChildren: 0.1 } } };
+    const itemVariants = { hidden: { opacity: 0, scale: 0.9 }, show: { opacity: 1, scale: 1 } };
 
     return (
-        <div style={{ background:bg, fontFamily:'Inter, system-ui, sans-serif', color:text, overflow:'hidden' }}>
-            <style>{`
-                @keyframes spin    { to { transform: rotate(360deg); } }
-                @keyframes fadeUp  { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
-                @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.35} }
-                @keyframes danger-glow { 0%,100%{box-shadow:0 0 8px rgba(239,68,68,0.4)} 50%{box-shadow:0 0 22px rgba(239,68,68,0.8)} }
-            `}</style>
+        <div style={{ background:bg, fontFamily:'Inter, system-ui, sans-serif', color:text, overflow:'hidden', minHeight:'100vh', position:'relative' }}>
+            {/* Ambient Background Glow */}
+            <motion.div animate={{ opacity:[0.1, 0.2, 0.1] }} transition={{ duration:10, repeat:Infinity }}
+                style={{ position:'absolute', top:'-20%', left:'50%', transform:'translateX(-50%)', width:'80vw', height:'40vh', background:`radial-gradient(ellipse, ${riskColor}30 0%, transparent 70%)`, filter:'blur(80px)', pointerEvents:'none' }}
+            />
 
-            {/* ── Header ───────────────────────────────────────────────── */}
-            <div style={{
-                background: isDark
-                    ? 'linear-gradient(135deg,rgba(9,14,28,0.98) 0%,rgba(22,18,60,0.98) 100%)'
-                    : 'linear-gradient(135deg,rgba(239,246,255,0.99) 0%,rgba(240,253,244,0.99) 100%)',
-                borderBottom: `1px solid ${border}`,
-                backdropFilter:'blur(14px)',
-                padding:'16px 20px',
-                display:'flex', alignItems:'center', gap:16,
-            }}>
-                <div style={{
-                    width:46, height:46, borderRadius:14, flexShrink:0,
-                    background:'rgba(59,130,246,0.12)', border:'1.5px solid rgba(59,130,246,0.3)',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    fontSize:22, boxShadow:'0 0 22px rgba(59,130,246,0.22)',
-                }}>🗺️</div>
+            {/* Header */}
+            <div style={{ position:'relative', zIndex:10, background: isDark ? 'rgba(2,6,23,0.7)' : 'rgba(255,255,255,0.7)', borderBottom: `1px solid ${border}`, backdropFilter:'blur(24px)', padding:'24px', display:'flex', alignItems:'center', gap:20 }}>
+                <motion.div initial={{ scale:0 }} animate={{ scale:1 }}
+                    style={{ width:56, height:56, borderRadius:18, background:`${riskColor}15`, border:`1px solid ${riskColor}40`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, boxShadow: `0 0 30px ${riskColor}30`, flexShrink:0 }}
+                >
+                    🗺️
+                </motion.div>
                 <div style={{ flex:1, minWidth:0 }}>
-                    <h2 style={{ margin:'0 0 3px', fontSize:15, fontWeight:700 }}>Capability Graph</h2>
-                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ width:6, height:6, borderRadius:'50%', background:'#3b82f6', boxShadow:'0 0 6px #3b82f6', display:'inline-block', animation:allFixed ? 'none' : 'pulse 2s ease infinite' }} />
-                        <span style={{ fontSize:12, color:sub }}>{data.agentId}</span>
-                        {allFixed && <span style={{ fontSize:11, color:'#10b981', fontWeight:600 }}>✓ All paths remediated</span>}
+                    <h2 style={{ margin:'0 0 6px', fontSize:18, fontWeight:800, letterSpacing:'-0.02em' }}>Security Topology</h2>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <motion.span animate={allFixed ? {} : { opacity:[1, 0.3, 1] }} transition={{ duration:2, repeat:Infinity }} style={{ width:8, height:8, borderRadius:'50%', background:riskColor, display:'inline-block', boxShadow:`0 0 10px ${riskColor}` }} />
+                        <span style={{ fontSize:14, color:text, fontWeight:600 }}>{data.agentId}</span>
+                        {allFixed && <span style={{ fontSize:12, color:'#10b981', fontWeight:700, marginLeft:6, padding:'2px 8px', borderRadius:20, background:'rgba(16,185,129,0.1)' }}>✓ Secure</span>}
                     </div>
                 </div>
-                {/* Risk badge */}
-                <div style={{
-                    textAlign:'center', background:`${riskColor}15`,
-                    border:`2px solid ${riskColor}40`, borderRadius:14,
-                    padding:'8px 16px', boxShadow:`0 0 20px ${riskColor}18`,
-                }}>
-                    <div style={{ fontSize:24, fontWeight:900, color:riskColor, lineHeight:1, fontFamily:'monospace' }}>
-                        {riskPct}%
-                    </div>
-                    <div style={{ fontSize:10, color:riskColor, fontWeight:700, marginTop:2, opacity:0.85, textTransform:'uppercase', letterSpacing:0.5 }}>
-                        {riskLabel}
-                    </div>
+                <div style={{ textAlign:'right', padding:'10px 20px', background:`${riskColor}10`, border:`1px solid ${riskColor}30`, borderRadius:16, boxShadow:inset }}>
+                    <div style={{ fontSize:28, fontWeight:900, color:riskColor, lineHeight:1, fontFamily:'monospace', letterSpacing:'-0.05em' }}>{riskPct}%</div>
+                    <div style={{ fontSize:10, color:riskColor, fontWeight:800, marginTop:4, textTransform:'uppercase', letterSpacing:'0.1em' }}>Risk</div>
                 </div>
             </div>
 
-            {/* ── Risk bar ─────────────────────────────────────────────── */}
-            <div style={{ height:3, background: isDark ? '#0f172a' : '#e2e8f0', overflow:'hidden' }}>
-                <div style={{
-                    height:'100%', width:`${riskPct}%`,
-                    background:`linear-gradient(90deg, ${riskColor}70, ${riskColor})`,
-                    transition:'width 1.2s cubic-bezier(0.4,0,0.2,1)',
-                    boxShadow:`0 0 10px ${riskColor}80`,
-                }} />
+            {/* Risk bar */}
+            <div style={{ position:'relative', zIndex:10, height:3, background: isDark ? '#0f172a' : '#e2e8f0', overflow:'hidden' }}>
+                <motion.div initial={{ width:0 }} animate={{ width:`${riskPct}%` }} transition={{ duration:1.5, ease:'circOut' }}
+                    style={{ height:'100%', background:`linear-gradient(90deg, transparent, ${riskColor})`, boxShadow:`0 0 12px ${riskColor}` }}
+                />
             </div>
 
-            {/* ── 3-Lane Graph ─────────────────────────────────────────── */}
-            <div style={{ padding:'20px 16px 8px', overflowX:'auto' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 28px 1.1fr 28px 1.4fr', gap:0, minWidth:480, alignItems:'start' }}>
-
-                    {/* Lane 1 — Agent */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                        <p style={{ margin:'0 0 10px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:1.1, color:sub, display:'flex', alignItems:'center', gap:6 }}>
-                            <span style={{ width:6, height:6, borderRadius:'50%', background:'#3b82f6', display:'inline-block', boxShadow:'0 0 5px #3b82f6' }} />
-                            Agent
-                        </p>
-                        {agentNode ? (
-                            <div style={{
-                                padding:'14px', borderRadius:14,
-                                background: isDark ? 'rgba(59,130,246,0.08)' : 'rgba(59,130,246,0.06)',
-                                border:'2px solid rgba(59,130,246,0.3)',
-                                display:'flex', flexDirection:'column', alignItems:'center', gap:7,
-                                boxShadow:'0 0 24px rgba(59,130,246,0.1)',
-                                animation:'fadeUp 0.4s ease both',
-                            }}>
-                                <span style={{ fontSize:26 }}>🤖</span>
-                                <span style={{ fontSize:11, fontWeight:700, color:'#60a5fa', textAlign:'center', wordBreak:'break-all' }}>
-                                    {agentNode.label}
-                                </span>
-                            </div>
-                        ) : (
-                            <div style={{ padding:'14px', borderRadius:14, background:lane, border:`1px dashed ${border}`, textAlign:'center', fontSize:12, color:sub }}>No agent</div>
-                        )}
-                    </div>
-
-                    {/* Arrow 1 */}
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', paddingTop:40 }}>
-                        <svg width="28" height="14" viewBox="0 0 28 14">
-                            <path d="M0 7 H20 M14 1 L22 7 L14 13" stroke={isDark ? '#334155' : '#cbd5e1'} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </div>
-
-                    {/* Lane 2 — Tools */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                        <p style={{ margin:'0 0 10px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:1.1, color:sub, display:'flex', alignItems:'center', gap:6 }}>
-                            <span style={{ width:6, height:6, borderRadius:'50%', background:'#8b5cf6', display:'inline-block', boxShadow:'0 0 5px #8b5cf6' }} />
-                            Connected Tools
-                        </p>
-                        {toolNodes.length === 0 ? (
-                            <div style={{ padding:'16px', borderRadius:12, background:lane, border:`1px dashed ${border}`, textAlign:'center', fontSize:12, color:sub }}>
-                                No tools connected
-                            </div>
-                        ) : toolNodes.map((n, i) => {
-                            const toolId  = n.id.replace('tool:', '');
-                            const danger  = dangerToolIds.has(n.id);
-                            const hovHL   = hovToolIds.has(n.id);
-                            const meta    = TOOL_META[toolId] ?? { emoji:'🔌', color:'#64748b', bg:'rgba(100,116,139,0.1)' };
-                            return (
-                                <div key={n.id} style={{
-                                    padding:'10px 12px', borderRadius:12,
-                                    background: hovHL ? `${meta.color}20` : danger ? (isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.05)') : card,
-                                    border:`1.5px solid ${hovHL ? `${meta.color}55` : danger ? 'rgba(239,68,68,0.42)' : border}`,
-                                    display:'flex', alignItems:'center', gap:9,
-                                    transition:'all 0.2s ease',
-                                    boxShadow: danger ? '0 0 0 0 rgba(239,68,68,0)' : 'none',
-                                    animation: danger
-                                        ? `fadeUp 0.35s ease ${i*0.07}s both, danger-glow 2.5s ease ${i*0.3}s infinite`
-                                        : `fadeUp 0.35s ease ${i*0.07}s both`,
-                                }}>
-                                    <span style={{ fontSize:18, flexShrink:0 }}>{meta.emoji}</span>
-                                    <span style={{ flex:1, fontSize:12, fontWeight:600, color: danger ? '#f87171' : isDark ? '#e2e8f0' : '#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                                        {n.label}
-                                    </span>
-                                    {danger && (
-                                        <span style={{ fontSize:9, fontWeight:800, background:'#ef444420', border:'1px solid #ef444455', color:'#f87171', padding:'2px 6px', borderRadius:20, flexShrink:0, animation:'pulse 1.8s ease infinite', letterSpacing:0.5 }}>
-                                            RISK
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Arrow 2 */}
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', paddingTop:40 }}>
-                        <svg width="28" height="14" viewBox="0 0 28 14">
-                            <path d="M0 7 H20 M14 1 L22 7 L14 13" stroke={isDark ? '#334155' : '#cbd5e1'} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </div>
-
-                    {/* Lane 3 — Capabilities */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                        <p style={{ margin:'0 0 10px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:1.1, color:sub, display:'flex', alignItems:'center', gap:6 }}>
-                            <span style={{ width:6, height:6, borderRadius:'50%', background:'#10b981', display:'inline-block', boxShadow:'0 0 5px #10b981' }} />
-                            Effective Capabilities
-                        </p>
-                        {capNodes.length === 0 ? (
-                            <div style={{ padding:'16px', borderRadius:12, background:lane, border:`1px dashed ${border}`, textAlign:'center', fontSize:12, color:sub }}>None granted</div>
-                        ) : capNodes.map((n, i) => {
-                            const danger  = dangerCapIds.has(n.id);
-                            const hovHL   = hovCapIds.has(n.id);
-                            return (
-                                <div key={n.id} style={{
-                                    padding:'9px 12px', borderRadius:10,
-                                    background: hovHL
-                                        ? (danger ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.12)')
-                                        : danger
-                                            ? (isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.05)')
-                                            : (isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)'),
-                                    border:`1px solid ${
-                                        hovHL ? (danger ? 'rgba(239,68,68,0.5)' : 'rgba(16,185,129,0.4)')
-                                        : danger ? 'rgba(239,68,68,0.3)'
-                                        : 'rgba(16,185,129,0.18)'
-                                    }`,
-                                    display:'flex', alignItems:'center', gap:8,
-                                    transition:'all 0.2s ease',
-                                    boxShadow: danger ? '0 0 10px rgba(239,68,68,0.1)' : 'none',
-                                    animation: danger
-                                        ? `fadeUp 0.35s ease ${i*0.06}s both, danger-glow 2.5s ease ${i*0.25}s infinite`
-                                        : `fadeUp 0.35s ease ${i*0.06}s both`,
-                                }}>
-                                    <span style={{ fontSize:13, flexShrink:0 }}>{CAP_ICONS[n.label] ?? '🔑'}</span>
-                                    <span style={{ flex:1, fontSize:11, fontWeight:700, color: danger ? '#f87171' : (isDark ? '#6ee7b7' : '#047857'), overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                                        {n.label}
-                                    </span>
-                                    {danger && <span style={{ fontSize:13, flexShrink:0, animation:'pulse 1.5s ease infinite' }}>⚠️</span>}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
-
-            {/* ── Attack Paths ──────────────────────────────────────────── */}
-            {data.attackPaths.length > 0 && (
-                <div style={{ padding:'0 16px 20px' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 0', borderTop:`1px solid ${border}`, marginTop:8 }}>
-                        <span style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:1, color:sub }}>
-                            Attack Paths
-                        </span>
-                        <span style={{
-                            fontSize:11, fontWeight:700, padding:'2px 9px', borderRadius:20,
-                            background: activePaths.length > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)',
-                            color: activePaths.length > 0 ? '#f87171' : '#34d399',
-                            border:`1px solid ${activePaths.length > 0 ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'}`,
-                        }}>
-                            {activePaths.length > 0 ? `${activePaths.length} active` : '✓ all clear'}
-                        </span>
-                        {allFixed && (
-                            <button
-                                onClick={() => sendFollowUpMessage(`Show the updated capability graph for ${data.agentId}`)}
-                                style={{ marginLeft:'auto', fontSize:11, padding:'3px 10px', borderRadius:8, background:'rgba(16,185,129,0.12)', border:'1px solid rgba(16,185,129,0.3)', color:'#34d399', cursor:'pointer', fontWeight:600 }}
-                            >
-                                ↻ Refresh graph
-                            </button>
-                        )}
-                    </div>
-
+            {/* 3-Lane Graph Content */}
+            <div style={{ position:'relative', zIndex:1, padding:'40px 24px', overflowX:'auto' }}>
+                <motion.div variants={laneVariants} initial="hidden" animate="show" style={{ display:'grid', gridTemplateColumns:'1fr 40px 1.2fr 40px 1.5fr', minWidth:600, alignItems:'start', gap:0 }}>
+                    
+                    {/* Lane 1: Agent */}
                     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                        {data.attackPaths.map((path, i) => {
-                            const isFixed  = fixed.includes(path.ruleId);
-                            const color    = SEV_COLOR[path.severity] ?? '#64748b';
-                            const isHov    = hovPath === path.ruleId;
-                            return (
-                                <div
-                                    key={path.ruleId}
-                                    onMouseEnter={() => setHovPath(path.ruleId)}
-                                    onMouseLeave={() => setHovPath(null)}
-                                    style={{
-                                        borderRadius:13,
-                                        border:`1.5px solid ${isFixed ? border : `${color}38`}`,
-                                        background: isFixed
-                                            ? (isDark ? 'rgba(15,23,42,0.4)' : 'rgba(248,250,252,0.8)')
-                                            : (isDark ? `${color}0b` : `${color}07`),
-                                        padding:'14px 16px',
-                                        opacity: isFixed ? 0.5 : 1,
-                                        transition:'all 0.25s ease',
-                                        boxShadow: isHov && !isFixed ? `0 6px 24px ${color}20, 0 0 0 1px ${color}22` : 'none',
-                                        animation:`fadeUp 0.32s ease ${i*0.1}s both`,
-                                    }}
-                                >
-                                    <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
-                                        <div style={{ flex:1, minWidth:0 }}>
-                                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6, flexWrap:'wrap' }}>
-                                                <span style={{
-                                                    fontSize:10, fontWeight:800, letterSpacing:0.8, textTransform:'uppercase',
-                                                    padding:'2px 8px', borderRadius:20,
-                                                    background:`${color}18`, border:`1px solid ${color}42`,
-                                                    color: isFixed ? sub : color,
-                                                }}>
-                                                    {path.severity}
-                                                </span>
-                                                <code style={{ fontSize:13, fontWeight:700, color: isFixed ? sub : (isDark ? '#e2e8f0' : '#1e293b') }}>
-                                                    {path.ruleId}
-                                                </code>
-                                                {isFixed && <span style={{ fontSize:11, color:'#34d399', fontWeight:700 }}>✓ Fixed</span>}
-                                            </div>
-                                            <p style={{ margin:'0 0 8px', fontSize:12, color: isDark ? '#94a3b8' : '#64748b', lineHeight:1.55 }}>
-                                                {path.message}
-                                            </p>
-                                            {/* Tool flow */}
-                                            <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:4 }}>
-                                                {path.viaTools.map((t, ti) => (
-                                                    <span key={t} style={{ display:'inline-flex', alignItems:'center', gap:3 }}>
-                                                        <span style={{
-                                                            fontSize:11, padding:'3px 9px', borderRadius:20,
-                                                            background: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.7)',
-                                                            border:`1px solid ${border}`,
-                                                            color: isDark ? '#cbd5e1' : '#475569', fontWeight:600,
-                                                            display:'inline-flex', alignItems:'center', gap:4,
-                                                        }}>
-                                                            {(TOOL_META[t]?.emoji ?? '🔌')} {t}
-                                                        </span>
-                                                        {ti < path.viaTools.length - 1 && <span style={{ color:color, fontSize:10, fontWeight:700 }}>+</span>}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
+                        <div style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', color:sub, marginBottom:6, display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{ width:6, height:6, borderRadius:'50%', background:'#3b82f6', display:'inline-block' }} /> IDENTITY
+                        </div>
+                        {agentNode && (
+                            <motion.div variants={itemVariants} style={{ padding:'24px', borderRadius:20, background: isDark?'rgba(59,130,246,0.1)':'rgba(59,130,246,0.05)', border:'1px solid rgba(59,130,246,0.4)', display:'flex', flexDirection:'column', alignItems:'center', gap:12, boxShadow:`0 0 40px rgba(59,130,246,0.1), ${inset}`, backdropFilter:'blur(20px)' }}>
+                                <span style={{ fontSize:32 }}>🤖</span>
+                                <span style={{ fontSize:13, fontWeight:800, color:'#60a5fa', textAlign:'center', wordBreak:'break-all' }}>{agentNode.label}</span>
+                            </motion.div>
+                        )}
+                    </div>
 
-                                        {!isFixed && (
-                                            <button
-                                                onClick={(e) => applyFix(e, path.ruleId)}
-                                                disabled={applying === path.ruleId}
-                                                style={{
-                                                    flexShrink:0, padding:'9px 14px',
-                                                    background: applying === path.ruleId
-                                                        ? (isDark ? '#1e293b' : '#f1f5f9')
-                                                        : `linear-gradient(135deg, ${color}ee, ${color}aa)`,
-                                                    color: applying === path.ruleId ? sub : '#fff',
-                                                    border:'none', borderRadius:10, fontWeight:700, fontSize:12,
-                                                    cursor: applying === path.ruleId ? 'not-allowed' : 'pointer',
-                                                    boxShadow: applying === path.ruleId ? 'none' : `0 4px 14px ${color}40`,
-                                                    transition:'all 0.2s ease',
-                                                    display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap',
-                                                }}
-                                            >
-                                                {applying === path.ruleId
-                                                    ? <><span style={{ width:12, height:12, border:`2px solid ${sub}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite', display:'inline-block' }} /> Fixing…</>
-                                                    : '🔧 Fix'
-                                                }
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', paddingTop:60 }}>
+                        <svg width="40" height="2" overflow="visible"><line x1="0" y1="0" x2="40" y2="0" stroke={border} strokeWidth="2" strokeDasharray="4 4" /></svg>
+                    </div>
+
+                    {/* Lane 2: Tools */}
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        <div style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', color:sub, marginBottom:6, display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{ width:6, height:6, borderRadius:'50%', background:'#8b5cf6', display:'inline-block' }} /> GATEWAYS
+                        </div>
+                        {toolNodes.map(n => {
+                            const ti = n.id.replace('tool:','');
+                            const m = TOOL_META[ti] || { emoji:'🔌', color:'#64748b' };
+                            const danger = dangerToolIds.has(n.id);
+                            const hov = hovToolIds.has(n.id);
+                            return (
+                                <motion.div key={n.id} variants={itemVariants} whileHover={{ x:4 }} style={{
+                                    padding:'14px 16px', borderRadius:16,
+                                    background: hov ? `${m.color}20` : danger ? 'rgba(239,68,68,0.15)' : card,
+                                    border: `1px solid ${hov ? `${m.color}60` : danger ? 'rgba(239,68,68,0.6)' : border}`,
+                                    display:'flex', alignItems:'center', gap:12, backdropFilter:'blur(20px)',
+                                    boxShadow: danger ? `0 0 20px rgba(239,68,68,0.3), ${inset}` : inset,
+                                }}>
+                                    <span style={{ fontSize:22 }}>{m.emoji}</span>
+                                    <span style={{ flex:1, fontSize:13, fontWeight:700, color: danger ? '#f87171' : text }}>{n.label}</span>
+                                    {danger && <motion.span animate={{ opacity:[1,0.5,1] }} transition={{ duration:1.5, repeat:Infinity }} style={{ fontSize:10, fontWeight:900, background:'#ef444430', color:'#fca5a5', padding:'2px 8px', borderRadius:20 }}>RISK</motion.span>}
+                                </motion.div>
                             );
                         })}
                     </div>
-                </div>
-            )}
 
-            {data.attackPaths.length === 0 && (
-                <div style={{ padding:'28px 20px 32px', textAlign:'center' }}>
-                    <div style={{ fontSize:44, marginBottom:10 }}>✅</div>
-                    <p style={{ margin:'0 0 4px', fontSize:14, fontWeight:700, color:'#10b981' }}>No attack paths detected</p>
-                    <p style={{ margin:0, fontSize:12, color:sub }}>This agent's capability combination is safe.</p>
-                </div>
-            )}
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', paddingTop:60 }}>
+                        <svg width="40" height="20" overflow="visible">
+                            {/* Animated data flow borders for danger edges */}
+                            {data.edges.filter(e => e.danger).length > 0 ? (
+                                <motion.line x1="0" y1="10" x2="40" y2="10" stroke="#ef4444" strokeWidth="2" strokeDasharray="8 8"
+                                    animate={{ strokeDashoffset: -16 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                    style={{ filter: 'drop-shadow(0 0 4px #ef4444)' }}
+                                />
+                            ) : (
+                                <line x1="0" y1="10" x2="40" y2="10" stroke={border} strokeWidth="2" strokeDasharray="4 4" />
+                            )}
+                        </svg>
+                    </div>
 
-            {/* ── Footer ───────────────────────────────────────────────── */}
-            <div style={{ borderTop:`1px solid ${border}`, padding:'10px 20px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:11, color:sub }}>🔒 Aegis · Deterministic engine</span>
-                <span style={{ fontSize:11, fontWeight:600, color: activePaths.length === 0 ? '#10b981' : '#f87171' }}>
-                    {toolNodes.length} tool{toolNodes.length !== 1 ? 's' : ''} · {capNodes.length} capabilit{capNodes.length !== 1 ? 'ies' : 'y'}
-                </span>
+                    {/* Lane 3: Capabilities */}
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        <div style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', color:sub, marginBottom:6, display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{ width:6, height:6, borderRadius:'50%', background:'#10b981', display:'inline-block' }} /> CAPABILITIES
+                        </div>
+                        {capNodes.map(n => {
+                            const danger = dangerCapIds.has(n.id);
+                            const hov = hovCapIds.has(n.id);
+                            return (
+                                <motion.div key={n.id} variants={itemVariants} whileHover={{ x:4 }} style={{
+                                    padding:'12px 16px', borderRadius:14,
+                                    background: hov ? (danger ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.2)') : danger ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.05)',
+                                    border: `1px solid ${hov ? (danger?'#ef4444':'#10b981') : danger ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.2)'}`,
+                                    display:'flex', alignItems:'center', gap:10, backdropFilter:'blur(20px)',
+                                    boxShadow: danger ? `0 0 20px rgba(239,68,68,0.2)` : 'none',
+                                }}>
+                                    <span style={{ fontSize:16 }}>{CAP_ICONS[n.label] ?? '🔑'}</span>
+                                    <span style={{ flex:1, fontSize:12, fontWeight:700, color: danger ? '#fca5a5' : isDark ? '#6ee7b7' : '#059669' }}>{n.label}</span>
+                                    {danger && <motion.span animate={{ scale:[1,1.2,1] }} transition={{ duration:1.5, repeat:Infinity }} style={{ fontSize:14 }}>⚠️</motion.span>}
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                </motion.div>
             </div>
+
+            {/* Attack Paths Panel */}
+            <AnimatePresence>
+                {data.attackPaths.length > 0 && (
+                    <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ padding: '0 24px 34px', position:'relative', zIndex:10 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+                            <h3 style={{ margin:0, fontSize:14, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', color:text }}>Active Attack Paths</h3>
+                            <div style={{ flex:1, height:1, background:border }} />
+                            {allFixed && (
+                                <motion.button whileHover={{ scale:1.05 }} onClick={() => sendFollowUpMessage(`Show updated capability graph for ${data.agentId}`)}
+                                    style={{ padding:'6px 14px', borderRadius:12, background:'rgba(16,185,129,0.15)', border:'1px solid rgba(16,185,129,0.4)', color:'#10b981', fontWeight:700, fontSize:12, cursor:'pointer' }}
+                                >
+                                    ↻ Refresh Dashboard
+                                </motion.button>
+                            )}
+                        </div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                            {data.attackPaths.map(path => {
+                                const isFixed = fixed.includes(path.ruleId);
+                                const color = SEV_COLOR[path.severity] ?? '#64748b';
+                                return (
+                                    <motion.div key={path.ruleId} layout onHoverStart={() => setHovPath(path.ruleId)} onHoverEnd={() => setHovPath(null)}
+                                        style={{
+                                            background: isFixed ? laneBg : isDark ? `${color}15` : `${color}10`,
+                                            border: `1px solid ${isFixed ? border : `${color}40`}`,
+                                            borderRadius: 20, padding: 20, opacity: isFixed ? 0.6 : 1,
+                                            boxShadow: isFixed ? 'none' : `inset 0 0 40px ${color}10`,
+                                            backdropFilter: 'blur(20px)',
+                                        }}
+                                    >
+                                        <div style={{ display:'flex', alignItems:'flex-start', gap:16 }}>
+                                            <div style={{ flex:1 }}>
+                                                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                                                    <span style={{ fontSize:10, fontWeight:900, background:`${color}20`, color, padding:'4px 10px', borderRadius:20, textTransform:'uppercase', letterSpacing:'0.05em' }}>{path.severity}</span>
+                                                    <code style={{ fontSize:15, fontWeight:800, color: isFixed ? sub : text }}>{path.ruleId}</code>
+                                                    {isFixed && <span style={{ fontSize:13, fontWeight:800, color:'#10b981' }}>✓ Neutralized</span>}
+                                                </div>
+                                                <p style={{ margin:'0 0 12px', fontSize:14, color: isDark ? '#cbd5e1' : '#475569', lineHeight:1.6 }}>{path.message}</p>
+                                                <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                                                    {path.viaTools.map((t, ti) => (
+                                                        <span key={t} style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+                                                            <span style={{ background:isDark?'rgba(0,0,0,0.3)':'rgba(255,255,255,0.7)', border:`1px solid ${border}`, padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:700, color:text }}>
+                                                                {(TOOL_META[t]?.emoji ?? '🔌')} {t}
+                                                            </span>
+                                                            {ti < path.viaTools.length - 1 && <span style={{ color, fontWeight:800 }}>+</span>}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            {!isFixed && (
+                                                <motion.button whileHover={{ scale:1.03 }} whileTap={{ scale:0.95 }}
+                                                    onClick={(e: React.MouseEvent) => applyFix(e, path.ruleId)} disabled={applying === path.ruleId}
+                                                    style={{
+                                                        padding:'12px 20px', borderRadius:14, border:'none',
+                                                        background: applying === path.ruleId ? laneBg : `linear-gradient(135deg, ${color}, ${color}cc)`,
+                                                        color: applying === path.ruleId ? sub : '#fff',
+                                                        fontWeight:800, fontSize:13, cursor: applying === path.ruleId ? 'wait' : 'pointer',
+                                                        boxShadow: `0 8px 24px ${color}30, inset 0 1px 0 rgba(255,255,255,0.3)`,
+                                                        display:'flex', alignItems:'center', gap:8
+                                                    }}
+                                                >
+                                                    {applying === path.ruleId ? 'Fixing...' : '🔧 Fix Workflow'}
+                                                </motion.button>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

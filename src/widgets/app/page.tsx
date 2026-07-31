@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useTheme, useWidgetSDK } from '@nitrostack/widgets';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const ACTIONS = [
     {
@@ -53,304 +54,260 @@ const CAP_COLOR: Record<string, string> = {
     DELETE_DATA: '#ef4444', EXECUTE: '#f97316', WRITE_DATA: '#3b82f6', READ_PUBLIC_DATA: '#10b981',
 };
 
+// --- Animations ---
+const containerVar = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } }
+};
+const itemVar = {
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 20, stiffness: 120 } }
+};
+
 export default function AegisDashboard() {
     const theme = useTheme();
     const isDark = theme === 'dark';
     const { sendFollowUpMessage } = useWidgetSDK();
 
-    const bg     = isDark ? '#060b14' : '#f0f4f8';
-    const card   = isDark ? 'rgba(15,23,42,0.75)' : 'rgba(255,255,255,0.92)';
-    const border = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
-    const text   = isDark ? '#f0f9ff' : '#0f172a';
-    const sub    = isDark ? '#64748b' : '#94a3b8';
-    const hr     = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
+    const bg     = isDark ? '#020617' : '#f8fafc'; // Ultra deep dark
+    const card   = isDark ? 'rgba(15, 23, 42, 0.5)' : 'rgba(255, 255, 255, 0.7)';
+    const cardHov= isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.95)';
+    const border = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.1)';
+    const borderH= isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(15, 23, 42, 0.2)';
+    const text   = isDark ? '#f8fafc' : '#0f172a';
+    const sub    = isDark ? '#94a3b8' : '#64748b';
+    const insetShadow = isDark 
+        ? 'inset 0 1px 0 rgba(255,255,255,0.06)' 
+        : 'inset 0 1px 0 rgba(255,255,255,1)';
 
     return (
-        <div style={{ background: bg, fontFamily: 'Inter, system-ui, sans-serif', color: text, minHeight: '100vh' }}>
-            <style>{`
-                @keyframes fadeUp  { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.35} }
-                @keyframes float   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
-                @keyframes shimmer { 0%{box-shadow:0 0 20px rgba(59,130,246,0.25)} 50%{box-shadow:0 0 42px rgba(59,130,246,0.55)} 100%{box-shadow:0 0 20px rgba(59,130,246,0.25)} }
-                .ac:hover { transform:translateY(-4px) !important; box-shadow:0 16px 40px rgba(0,0,0,0.18) !important; }
-                .ac { transition:transform 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s ease !important; }
-                .tb:hover { opacity:0.88; transform:scale(1.02); }
-                .tb { transition:all 0.15s ease; }
-            `}</style>
-
-            {/* ── Hero ──────────────────────────────────────────────────────── */}
-            <div style={{
-                position: 'relative', overflow: 'hidden',
-                background: isDark
-                    ? 'linear-gradient(140deg, #06090f 0%, #0c1732 55%, #080e1e 100%)'
-                    : 'linear-gradient(140deg, #eff6ff 0%, #f0fdf4 100%)',
-                borderBottom: `1px solid ${border}`,
-                padding: '48px 24px 44px',
-                textAlign: 'center',
-            }}>
-                {isDark && <>
-                    <div style={{ position:'absolute', width:380, height:380, borderRadius:'50%', background:'radial-gradient(circle, rgba(59,130,246,0.14) 0%, transparent 70%)', top:-120, left:'3%', pointerEvents:'none' }} />
-                    <div style={{ position:'absolute', width:300, height:300, borderRadius:'50%', background:'radial-gradient(circle, rgba(139,92,246,0.11) 0%, transparent 70%)', bottom:-80, right:'6%', pointerEvents:'none' }} />
-                    <div style={{ position:'absolute', width:200, height:200, borderRadius:'50%', background:'radial-gradient(circle, rgba(239,68,68,0.07) 0%, transparent 70%)', top:'25%', right:'28%', pointerEvents:'none' }} />
-                </>}
-
-                <div style={{
-                    display:'inline-flex', alignItems:'center', justifyContent:'center',
-                    width:92, height:92, borderRadius:28, marginBottom:24,
-                    background: isDark ? 'rgba(59,130,246,0.1)' : 'rgba(59,130,246,0.08)',
-                    border:'2px solid rgba(59,130,246,0.32)',
-                    fontSize:46,
-                    animation:'float 3.2s ease-in-out infinite, shimmer 3.2s ease-in-out infinite',
-                }}>
-                    🛡️
-                </div>
-
-                <h1 style={{
-                    margin:'0 0 8px', fontSize:40, fontWeight:900, letterSpacing:-1.5,
-                    background: isDark
-                        ? 'linear-gradient(135deg, #93c5fd 0%, #c4b5fd 100%)'
-                        : 'linear-gradient(135deg, #1d4ed8, #7c3aed)',
-                    WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
-                }}>
-                    Aegis
-                </h1>
-                <p style={{ margin:'0 auto 6px', fontSize:17, fontWeight:600, color: isDark ? '#e2e8f0' : '#1e293b', maxWidth:500 }}>
-                    Blast-radius auditor for AI agents
-                </p>
-                <p style={{ margin:'0 auto', fontSize:13, color:sub, maxWidth:460, lineHeight:1.7 }}>
-                    Detects toxic capability combinations before they become exploits — pure TypeScript, zero LLM tokens.
-                </p>
-
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginTop:26, flexWrap:'wrap' }}>
-                    {[
-                        { dot:'#10b981', label:'Detection engine live' },
-                        { dot:'#3b82f6', label:'3 policy rules active' },
-                        { dot:'#8b5cf6', label:'6 tool integrations' },
-                    ].map(p => (
-                        <div key={p.label} style={{
-                            display:'inline-flex', alignItems:'center', gap:6,
-                            padding:'5px 14px', borderRadius:20,
-                            background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                            border:`1px solid ${border}`, fontSize:12, color:sub,
-                            backdropFilter:'blur(8px)',
-                        }}>
-                            <span style={{ width:6, height:6, borderRadius:'50%', background:p.dot, animation:'pulse 2s ease infinite', display:'inline-block', boxShadow:`0 0 6px ${p.dot}` }} />
-                            {p.label}
-                        </div>
-                    ))}
-                </div>
+        <div style={{ background: bg, minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif', color: text, overflow: 'hidden', position: 'relative' }}>
+            
+            {/* Animated Ambient Mesh Background */}
+            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+                {isDark ? (
+                    <>
+                        <motion.div animate={{ scale:[1, 1.2, 1], opacity:[0.15, 0.25, 0.15], rotate:[0, 90, 0] }} transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+                            style={{ position:'absolute', width:'50vw', height:'50vw', top:'-10%', left:'-10%', background:'radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%)', filter:'blur(80px)' }} />
+                        <motion.div animate={{ scale:[1.2, 1, 1.2], opacity:[0.1, 0.2, 0.1], rotate:[0, -90, 0] }} transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+                            style={{ position:'absolute', width:'40vw', height:'40vw', bottom:'-10%', right:'-10%', background:'radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%)', filter:'blur(60px)' }} />
+                        <motion.div animate={{ opacity:[0.05, 0.15, 0.05] }} transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+                            style={{ position:'absolute', width:'30vw', height:'30vw', top:'40%', left:'50%', transform:'translate(-50%, -50%)', background:'radial-gradient(circle, rgba(239,68,68,0.15) 0%, transparent 60%)', filter:'blur(90px)' }} />
+                    </>
+                ) : (
+                    <>
+                        <div style={{ position:'absolute', width:'100%', height:'40vh', top:0, background:'linear-gradient(180deg, #e0e7ff 0%, transparent 100%)', opacity:0.6 }} />
+                        <div style={{ position:'absolute', width:'60vw', height:'60vw', top:'-20%', right:'-20%', background:'radial-gradient(circle, rgba(147,197,253,0.3) 0%, transparent 70%)', filter:'blur(60px)' }} />
+                    </>
+                )}
             </div>
 
-            <div style={{ padding:'32px 20px 48px', maxWidth:740, margin:'0 auto', display:'flex', flexDirection:'column', gap:36 }}>
+            {/* Scrollable Content (z-index above bg) */}
+            <div style={{ position: 'relative', zIndex: 1, paddingBottom: 60 }}>
+                
+                {/* ── Hero ──────────────────────────────────────────────────────── */}
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ paddingTop: 60, paddingBottom: 50, textAlign: 'center', borderBottom: `1px solid ${border}`, background: isDark ? 'rgba(2,6,23,0.4)' : 'rgba(255,255,255,0.4)', backdropFilter: 'blur(20px)' }}
+                >
+                    <motion.div
+                        whileHover={{ scale: 1.05, rotate: [0, -5, 5, 0] }} transition={{ duration: 0.5 }}
+                        style={{
+                            display:'inline-flex', alignItems:'center', justifyContent:'center',
+                            width: 80, height: 80, borderRadius: 24, marginBottom: 24,
+                            background: isDark ? 'rgba(59,130,246,0.15)' : '#fff',
+                            border: `1px solid rgba(59,130,246,0.5)`,
+                            fontSize: 38,
+                            boxShadow: isDark ? '0 0 40px rgba(59,130,246,0.3), inset 0 1px 0 rgba(255,255,255,0.2)' : '0 10px 30px rgba(59,130,246,0.2)',
+                            backdropFilter: 'blur(20px)',
+                        }}
+                    >
+                        <motion.span animate={{ scale:[1, 1.1, 1] }} transition={{ duration:2, repeat:Infinity }}>🛡️</motion.span>
+                    </motion.div>
 
-                {/* ── Quick Actions ────────────────────────────────────────── */}
-                <section style={{ animation:'fadeUp 0.45s ease 0.05s both' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:6 }}>
-                        <h2 style={{ margin:0, fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:1.5, color:sub }}>
-                            Start an Audit
-                        </h2>
-                        <div style={{ flex:1, height:1, background:hr }} />
-                    </div>
-                    <p style={{ margin:'0 0 16px', fontSize:12, color:sub, lineHeight:1.6 }}>
-                        Click <strong style={{ color: isDark ? '#94a3b8' : '#64748b' }}>▶ Try in Chat</strong> to fire any tool directly into the conversation — results appear instantly as widgets.
+                    <h1 style={{
+                        margin:'0 0 12px', fontSize: 48, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.1,
+                        background: isDark ? 'linear-gradient(to right bottom, #ffffff 30%, #94a3b8 100%)' : 'linear-gradient(to right bottom, #0f172a 30%, #475569 100%)',
+                        WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+                    }}>
+                        Aegis
+                    </h1>
+                    <p style={{ margin:'0 auto 8px', fontSize: 18, fontWeight: 500, color: text, maxWidth: 500, letterSpacing: '-0.01em' }}>
+                        Enterprise Blast-Radius Auditor
                     </p>
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(310px, 1fr))', gap:10 }}>
-                        {ACTIONS.map((a, i) => (
-                            <div key={a.name} className="ac" style={{
-                                background:card, border:`1px solid ${border}`,
-                                borderRadius:18, padding:'20px',
-                                backdropFilter:'blur(12px)',
-                                animation:`fadeUp 0.38s ease ${0.08 + i*0.08}s both`,
-                            }}>
-                                <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom:12 }}>
-                                    <div style={{
-                                        width:46, height:46, borderRadius:14, flexShrink:0,
-                                        background:`${a.color}12`, border:`1.5px solid ${a.color}30`,
-                                        display:'flex', alignItems:'center', justifyContent:'center',
-                                        fontSize:22, boxShadow:`0 0 18px ${a.color}18`,
-                                    }}>
-                                        {a.icon}
-                                    </div>
-                                    <div style={{ flex:1 }}>
-                                        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
-                                            <code style={{ fontSize:12, fontWeight:700, color:a.color }}>{a.name}</code>
-                                            <span style={{
-                                                fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:20,
-                                                background:`${a.color}15`, border:`1px solid ${a.color}35`,
-                                                color:a.color, letterSpacing:0.5, textTransform:'uppercase',
-                                            }}>
-                                                {a.badge}
-                                            </span>
-                                        </div>
-                                        <p style={{ margin:0, fontSize:12, color:sub, lineHeight:1.6 }}>{a.desc}</p>
-                                    </div>
-                                </div>
+                    <p style={{ margin:'0 auto', fontSize: 14, color: sub, maxWidth: 480, lineHeight: 1.6 }}>
+                        Zero-token deterministic security engine tracking toxic capability intersections across active tool integrations in real-time.
+                    </p>
 
-                                {a.integrations.length > 0 && (
-                                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:12 }}>
-                                        {a.integrations.map(t => (
-                                            <span key={t} style={{
-                                                fontSize:10, padding:'2px 8px', borderRadius:20,
-                                                background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                                                border:`1px solid ${border}`, color:sub, fontFamily:'monospace',
-                                            }}>
-                                                {t}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:12, marginTop:32, flexWrap:'wrap' }}>
+                        {[ { dot:'#10b981', l:'Engine Live' }, { dot:'#3b82f6', l:'3 Policies' }, { dot:'#8b5cf6', l:'6 Integrations' } ].map((p, i) => (
+                            <motion.div key={p.l} initial={{ opacity:0, scale:0.9 }} animate={{ opacity:1, scale:1 }} transition={{ delay: 0.3 + (i*0.1) }}
+                                style={{
+                                    display:'inline-flex', alignItems:'center', gap:8,
+                                    padding:'6px 14px', borderRadius: 20,
+                                    background: card, border:`1px solid ${border}`, 
+                                    fontSize:13, fontWeight:600, color:text,
+                                    backdropFilter:'blur(10px)', boxShadow: insetShadow,
+                                }}
+                            >
+                                <span style={{ width:6, height:6, borderRadius:'50%', background:p.dot, display:'inline-block', boxShadow:`0 0 8px ${p.dot}` }} />
+                                {p.l}
+                            </motion.div>
+                        ))}
+                    </div>
+                </motion.div>
 
-                                <button
-                                    id={`action-${a.name}`}
-                                    className="tb"
-                                    onClick={() => sendFollowUpMessage(a.prompt)}
+                {/* ── Main Layout ────────────────────────────────────────── */}
+                <motion.div variants={containerVar} initial="hidden" animate="show" style={{ maxWidth: 840, margin: '0 auto', padding: '40px 20px', display:'flex', flexDirection:'column', gap:48 }}>
+
+                    {/* Section: Quick Actions */}
+                    <section>
+                        <motion.div variants={itemVar} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+                            <h2 style={{ margin:0, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:sub }}>Actions</h2>
+                            <div style={{ flex:1, height:1, background:border }} />
+                        </motion.div>
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))', gap:16 }}>
+                            {ACTIONS.map(a => (
+                                <motion.div key={a.name} variants={itemVar} whileHover={{ y: -4, borderColor: borderH, boxShadow: `0 20px 40px rgba(0,0,0,0.2), ${insetShadow}` }} transition={{ type:'spring', damping:25, stiffness:200 }}
                                     style={{
-                                        width:'100%', padding:'10px 16px', border:'none', borderRadius:11,
-                                        background:`linear-gradient(135deg, ${a.color}ee, ${a.color}99)`,
-                                        color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer',
-                                        boxShadow:`0 4px 16px ${a.color}30`,
-                                        display:'flex', alignItems:'center', justifyContent:'center', gap:7,
-                                        letterSpacing:0.2,
+                                        background: card, border: `1px solid ${border}`,
+                                        borderRadius: 20, padding: 24,
+                                        backdropFilter: 'blur(20px)', boxShadow: insetShadow,
+                                        display: 'flex', flexDirection: 'column', height: '100%',
                                     }}
                                 >
-                                    <span>▶</span> Try in Chat
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
-                {/* ── Policy Rules ─────────────────────────────────────────── */}
-                <section style={{ animation:'fadeUp 0.45s ease 0.32s both' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
-                        <h2 style={{ margin:0, fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:1.5, color:sub }}>
-                            Active Policy Rules
-                        </h2>
-                        <div style={{ flex:1, height:1, background:hr }} />
-                        <span style={{
-                            fontSize:10, fontWeight:700, padding:'2px 9px', borderRadius:20,
-                            background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.25)',
-                            color:'#f87171',
-                        }}>
-                            {RULES.length} rules
-                        </span>
-                    </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                        {RULES.map((r, i) => (
-                            <div key={r.id} style={{
-                                background:card, border:`1px solid ${border}`,
-                                borderRadius:14, padding:'14px 16px',
-                                display:'flex', alignItems:'center', gap:14,
-                                backdropFilter:'blur(10px)',
-                                borderLeft:`3px solid ${r.color}`,
-                                animation:`fadeUp 0.38s ease ${0.32 + i*0.08}s both`,
-                            }}>
-                                <div style={{
-                                    width:42, height:42, borderRadius:12, flexShrink:0,
-                                    background:`${r.color}12`, border:`1.5px solid ${r.color}30`,
-                                    display:'flex', alignItems:'center', justifyContent:'center',
-                                    fontSize:20, boxShadow:`0 0 18px ${r.color}18`,
-                                }}>
-                                    {r.icon}
-                                </div>
-                                <div style={{ flex:1, minWidth:0 }}>
-                                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5, flexWrap:'wrap' }}>
-                                        <span style={{ fontSize:13, fontWeight:700 }}>{r.id}</span>
-                                        <span style={{
-                                            fontSize:9, fontWeight:800, padding:'2px 8px', borderRadius:20,
-                                            textTransform:'uppercase', letterSpacing:0.7,
-                                            background:`${r.color}15`, border:`1px solid ${r.color}40`, color:r.color,
+                                    <div style={{ display:'flex', alignItems:'flex-start', gap:14, marginBottom:16 }}>
+                                        <div style={{
+                                            width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+                                            background: `${a.color}15`, border: `1px solid ${a.color}30`,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: 22, boxShadow: `0 0 20px ${a.color}15`,
                                         }}>
-                                            {r.sev}
-                                        </span>
-                                        <span style={{ fontSize:11, color:sub }}>
-                                            weight {r.weight.toFixed(1)}
-                                        </span>
-                                    </div>
-                                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                                        <code style={{
-                                            fontSize:11, color: isDark ? '#94a3b8' : '#475569',
-                                            background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                                            padding:'2px 7px', borderRadius:5,
-                                        }}>
-                                            {r.src}
-                                        </code>
-                                        <span style={{ color:r.color, fontSize:14, fontWeight:700 }}>→</span>
-                                        <code style={{
-                                            fontSize:11, color: isDark ? '#94a3b8' : '#475569',
-                                            background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                                            padding:'2px 7px', borderRadius:5,
-                                        }}>
-                                            {r.sink}
-                                        </code>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
-                {/* ── Tool Registry ─────────────────────────────────────────── */}
-                <section style={{ animation:'fadeUp 0.45s ease 0.52s both' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
-                        <h2 style={{ margin:0, fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:1.5, color:sub }}>
-                            Tool Registry
-                        </h2>
-                        <div style={{ flex:1, height:1, background:hr }} />
-                        <span style={{
-                            fontSize:10, fontWeight:700, padding:'2px 9px', borderRadius:20,
-                            background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.25)',
-                            color:'#60a5fa',
-                        }}>
-                            6 integrations
-                        </span>
-                    </div>
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(218px, 1fr))', gap:8 }}>
-                        {INTEGRATIONS.map((int, i) => (
-                            <div key={int.name} style={{
-                                background:card, border:`1px solid ${border}`,
-                                borderRadius:14, padding:'15px',
-                                backdropFilter:'blur(10px)',
-                                animation:`fadeUp 0.38s ease ${0.52 + i*0.06}s both`,
-                            }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                                    <div style={{
-                                        width:36, height:36, borderRadius:10, flexShrink:0,
-                                        background:`${int.color}12`, border:`1.5px solid ${int.color}30`,
-                                        display:'flex', alignItems:'center', justifyContent:'center',
-                                        fontSize:18,
-                                    }}>
-                                        {int.emoji}
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize:13, fontWeight:700, color: isDark ? '#e2e8f0' : '#1e293b' }}>{int.name}</div>
-                                        <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:2 }}>
-                                            <span style={{ width:5, height:5, borderRadius:'50%', background:int.color, boxShadow:`0 0 5px ${int.color}`, display:'inline-block' }} />
-                                            <span style={{ fontSize:10, color:sub }}>{int.caps.length} caps</span>
+                                            {a.icon}
+                                        </div>
+                                        <div style={{ flex:1 }}>
+                                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                                                <code style={{ fontSize:13, fontWeight:700, color: isDark ? a.color : '#0f172a' }}>{a.name}</code>
+                                                <span style={{ fontSize:9, fontWeight:800, padding:'2px 8px', borderRadius:20, background:`${a.color}15`, color:a.color, textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                                                    {a.badge}
+                                                </span>
+                                            </div>
+                                            <p style={{ margin:0, fontSize:13, color:sub, lineHeight:1.6 }}>{a.desc}</p>
                                         </div>
                                     </div>
-                                </div>
-                                <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
-                                    {int.caps.map(cap => {
-                                        const c = CAP_COLOR[cap] || '#64748b';
-                                        const isDanger = CAP_DANGER.has(cap);
-                                        return (
-                                            <span key={cap} style={{
-                                                fontSize:9, padding:'2px 7px', borderRadius:20, fontWeight:600,
-                                                background:`${c}${isDanger ? '16' : '10'}`,
-                                                border:`1px solid ${c}${isDanger ? '45' : '28'}`,
-                                                color:c,
-                                            }}>
-                                                {isDanger ? '⚠️ ' : ''}{cap.replace(/_/g, ' ')}
-                                            </span>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                                    <div style={{ marginTop:'auto', paddingTop:16 }}>
+                                        <motion.button
+                                            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                                            onClick={() => sendFollowUpMessage(a.prompt)}
+                                            style={{
+                                                width:'100%', padding:'12px 16px', border:'none', borderRadius:12,
+                                                background: `linear-gradient(135deg, ${a.color}, ${a.color}dd)`,
+                                                color:'#fff', fontWeight:600, fontSize:13, cursor:'pointer',
+                                                boxShadow: `0 8px 20px ${a.color}30, inset 0 1px 0 rgba(255,255,255,0.3)`,
+                                                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                                            }}
+                                        >
+                                            <span style={{ opacity:0.8 }}>▶</span> Execute Sequence
+                                        </motion.button>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </section>
 
+                    {/* Section: Policy Rules */}
+                    <section>
+                        <motion.div variants={itemVar} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+                            <h2 style={{ margin:0, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:sub }}>Active Policies</h2>
+                            <div style={{ flex:1, height:1, background:border }} />
+                        </motion.div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                            {RULES.map(r => (
+                                <motion.div key={r.id} variants={itemVar} whileHover={{ x: 4, background: cardHov }}
+                                    style={{
+                                        background: card, border: `1px solid ${border}`,
+                                        borderRadius: 16, padding: '16px 20px',
+                                        display: 'flex', alignItems: 'center', gap: 16,
+                                        backdropFilter: 'blur(20px)', boxShadow: insetShadow,
+                                        borderLeft: `4px solid ${r.color}`,
+                                    }}
+                                >
+                                    <div style={{
+                                        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                                        background: `${r.color}15`, border: `1px solid ${r.color}30`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: 20, boxShadow: `0 0 20px ${r.color}15`,
+                                    }}>
+                                        {r.icon}
+                                    </div>
+                                    <div style={{ flex:1, minWidth:0, display:'flex', flexWrap:'wrap', gap:12, alignItems:'center', justifyContent:'space-between' }}>
+                                        <div>
+                                            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                                                <span style={{ fontSize:14, fontWeight:700, color:text }}>{r.id}</span>
+                                                <span style={{ fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:20, background:`${r.color}15`, border:`1px solid ${r.color}30`, color:r.color, textTransform:'uppercase' }}>
+                                                    {r.sev}
+                                                </span>
+                                            </div>
+                                            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                                                <code style={{ fontSize:11, color:text, background: isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)', padding:'3px 8px', borderRadius:6, border:`1px solid ${border}` }}>{r.src}</code>
+                                                <span style={{ color:r.color, fontSize:14, fontWeight:700, opacity:0.7 }}>→</span>
+                                                <code style={{ fontSize:11, color:text, background: isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)', padding:'3px 8px', borderRadius:6, border:`1px solid ${border}` }}>{r.sink}</code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* Section: Tool Registry */}
+                    <section>
+                        <motion.div variants={itemVar} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+                            <h2 style={{ margin:0, fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:sub }}>Integration Topology</h2>
+                            <div style={{ flex:1, height:1, background:border }} />
+                        </motion.div>
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:12 }}>
+                            {INTEGRATIONS.map(int => (
+                                <motion.div key={int.name} variants={itemVar} whileHover={{ scale: 1.02 }}
+                                    style={{
+                                        background: card, border: `1px solid ${border}`,
+                                        borderRadius: 16, padding: '16px',
+                                        backdropFilter: 'blur(20px)', boxShadow: insetShadow,
+                                    }}
+                                >
+                                    <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+                                        <div style={{
+                                            width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                                            background: `${int.color}15`, border: `1px solid ${int.color}30`,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+                                        }}>
+                                            {int.emoji}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize:14, fontWeight:700, color: text }}>{int.name}</div>
+                                            <div style={{ fontSize:11, color:sub, marginTop:2, fontWeight:500 }}>{int.caps.length} caps</div>
+                                        </div>
+                                    </div>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                                        {int.caps.map(cap => {
+                                            const c = CAP_COLOR[cap] || '#64748b';
+                                            const drawAttn = CAP_DANGER.has(cap);
+                                            return (
+                                                <span key={cap} style={{
+                                                    fontSize:10, padding:'3px 8px', borderRadius:20, fontWeight:600,
+                                                    background: drawAttn ? `${c}1A` : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                                    border:`1px solid ${drawAttn ? `${c}40` : border}`,
+                                                    color: drawAttn ? c : sub,
+                                                }}>
+                                                    {cap.replace(/_/g, ' ')}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </section>
+                </motion.div>
             </div>
         </div>
     );

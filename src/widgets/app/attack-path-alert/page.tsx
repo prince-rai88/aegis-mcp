@@ -4,8 +4,9 @@ export const dynamic = 'force-dynamic';
 
 import { useWidgetSDK, useTheme } from '@nitrostack/widgets';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-interface AttackPath { ruleId: string; severity: 'critical' | 'high' | 'medium'; viaTools: string[]; message: string; }
+interface AttackPath { ruleId: string; source: string; sink: string; viaTools: string[]; severity: 'critical' | 'high' | 'medium'; message: string; }
 interface AttackPathData { agentId: string; paths: AttackPath[]; riskScore: number; }
 
 const TOOL_META: Record<string, { emoji: string; color: string }> = {
@@ -17,311 +18,190 @@ const TOOL_META: Record<string, { emoji: string; color: string }> = {
     calendar:   { emoji: '📅', color: '#10b981' },
 };
 
-const SEV: Record<string, { label: string; color: string; glow: string; gradient: string; border: string; lightGrad: string; lightBorder: string }> = {
-    critical: { label:'Critical', color:'#ef4444', glow:'rgba(239,68,68,0.3)',  gradient:'linear-gradient(135deg,#450a0a,#1c0a0a)', border:'#7f1d1d', lightGrad:'linear-gradient(135deg,#fef2f2,#fff5f5)', lightBorder:'#fecaca' },
-    high:     { label:'High',     color:'#f97316', glow:'rgba(249,115,22,0.3)', gradient:'linear-gradient(135deg,#431407,#1c0a03)', border:'#7c2d12', lightGrad:'linear-gradient(135deg,#fff7ed,#fffbf5)', lightBorder:'#fed7aa' },
-    medium:   { label:'Medium',   color:'#eab308', glow:'rgba(234,179,8,0.25)', gradient:'linear-gradient(135deg,#422006,#1c1003)', border:'#78350f', lightGrad:'linear-gradient(135deg,#fefce8,#fffff5)', lightBorder:'#fde68a' },
-};
+const SEV_COLOR: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308' };
 
-function RiskGauge({ score, isDark }: { score: number; isDark: boolean }) {
-    const pct   = Math.round(score * 100);
-    const color = pct === 0 ? '#10b981' : pct < 60 ? '#f97316' : '#ef4444';
-    const label = pct === 0 ? 'Secure' : pct < 40 ? 'Low' : pct < 70 ? 'High' : 'Critical';
-    const C     = 2 * Math.PI * 28;
-    const dash  = C * (1 - score);
-    return (
-        <div style={{ position:'relative', width:80, height:80, flexShrink:0 }}>
-            <svg width="80" height="80" style={{ transform:'rotate(-90deg)' }}>
-                <circle cx="40" cy="40" r="28" fill="none" stroke={isDark ? '#1f2937' : '#e5e7eb'} strokeWidth="6" />
-                <circle cx="40" cy="40" r="28" fill="none" stroke={color} strokeWidth="6"
-                    strokeDasharray={C} strokeDashoffset={dash} strokeLinecap="round"
-                    style={{ transition:'stroke-dashoffset 1s ease, stroke 0.5s ease', filter:`drop-shadow(0 0 7px ${color})` }} />
-            </svg>
-            <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-                <span style={{ fontSize:19, fontWeight:900, color, lineHeight:1, fontFamily:'monospace' }}>{pct}</span>
-                <span style={{ fontSize:9, color: isDark ? '#6b7280' : '#9ca3af', fontWeight:700, letterSpacing:0.5, textTransform:'uppercase' }}>{label}</span>
-            </div>
-        </div>
-    );
-}
-
-export default function AttackPathAlertWidget() {
-    const theme  = useTheme();
+export default function AttackPathAlert() {
+    const theme = useTheme();
     const isDark = theme === 'dark';
-    const { getToolOutput, callTool, isReady, sendFollowUpMessage } = useWidgetSDK();
-    const data   = getToolOutput<AttackPathData>();
+    const { getToolOutput, callTool, sendFollowUpMessage, isReady } = useWidgetSDK();
+    const data = getToolOutput<AttackPathData>();
 
-    const [expanded, setExpanded] = useState<string | null>(null);
     const [applying, setApplying] = useState<string | null>(null);
-    const [fixed,    setFixed]    = useState<string[]>([]);
-    const [hovered,  setHovered]  = useState<string | null>(null);
+    const [fixed, setFixed] = useState<string[]>([]);
+    const [viewGraph, setViewGraph] = useState(false);
 
-    const applyFix = async (e: React.MouseEvent, ruleId: string) => {
-        e.stopPropagation();
+    const applyFix = async (ruleId: string) => {
         if (!data) return;
         setApplying(ruleId);
         try {
             await callTool('apply_policy_fix', { agentId: data.agentId, ruleId });
             setFixed(prev => [...prev, ruleId]);
-            setExpanded(null);
-        } finally { setApplying(null); }
+        } finally {
+            setApplying(null);
+        }
     };
 
-    const bg      = isDark ? '#060b14' : '#f0f4f8';
-    const card    = isDark ? 'rgba(15,23,42,0.82)' : 'rgba(255,255,255,0.92)';
-    const border  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
-    const text    = isDark ? '#f0f9ff' : '#0f172a';
-    const sub     = isDark ? '#64748b' : '#94a3b8';
-    const surface = isDark ? 'rgba(30,41,59,0.55)' : 'rgba(241,245,249,0.85)';
+    const bg     = isDark ? '#020617' : '#f8fafc';
+    const card   = isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.8)';
+    const border = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+    const text   = isDark ? '#f8fafc' : '#0f172a';
+    const sub    = isDark ? '#94a3b8' : '#64748b';
+    const inset  = isDark ? 'inset 0 1px 0 rgba(255,255,255,0.06)' : 'inset 0 1px 0 rgba(255,255,255,1)';
 
     if (!isReady || !data) {
         return (
-            <div style={{ background:bg, minHeight:300, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, fontFamily:'Inter, system-ui, sans-serif' }}>
-                <div style={{ width:48, height:48, border:`3px solid ${isDark ? '#1e3a5f' : '#bfdbfe'}`, borderTopColor:'#3b82f6', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
-                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-                <p style={{ color:sub, fontSize:13, margin:0 }}>Analysing attack surface…</p>
+            <div style={{ background:bg, minHeight:300, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:20, fontFamily:'Inter, system-ui, sans-serif' }}>
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    style={{ width: 44, height: 44, border: `3px solid ${border}`, borderTopColor: '#ef4444', borderRadius: '50%' }}
+                />
+                <motion.p animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }} style={{ color:sub, fontSize:14, fontWeight:500, margin:0 }}>
+                    Scanning capability combinations...
+                </motion.p>
             </div>
         );
     }
 
-    const riskPct     = Math.round(data.riskScore * 100);
-    const activeCount = data.paths.filter(p => !fixed.includes(p.ruleId)).length;
-    const allClear    = activeCount === 0;
+    const activePaths = data.paths.filter(p => !fixed.includes(p.ruleId));
+    const isAllClear  = data.paths.length === 0 || activePaths.length === 0;
 
     return (
-        <div style={{ background:bg, fontFamily:'Inter, system-ui, sans-serif', color:text, minWidth:320 }}>
-            <style>{`
-                @keyframes spin        { to { transform:rotate(360deg); } }
-                @keyframes fadeSlideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-                @keyframes pulse       { 0%,100%{opacity:1} 50%{opacity:0.4} }
-                @keyframes bounce-in   { 0%{transform:scale(0.7);opacity:0} 70%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
-            `}</style>
+        <div style={{ background:bg, fontFamily:'Inter, system-ui, sans-serif', color:text, overflow:'hidden', minHeight:'100%', position:'relative' }}>
+            
+            {/* Ambient Background Glow based on state */}
+            <motion.div animate={{ opacity:[0.15, 0.25, 0.15] }} transition={{ duration:8, repeat:Infinity }}
+                style={{ position:'absolute', top:'-30%', left:'50%', transform:'translateX(-50%)', width:'100vw', height:'60vh', background:`radial-gradient(ellipse, ${isAllClear ? '#10b981' : '#ef4444'}30 0%, transparent 70%)`, filter:'blur(80px)', pointerEvents:'none' }}
+            />
 
-            {/* ── Header ───────────────────────────────────────────────── */}
-            <div style={{
-                background: isDark
-                    ? 'linear-gradient(135deg,rgba(9,14,28,0.97) 0%,rgba(22,18,60,0.97) 100%)'
-                    : 'linear-gradient(135deg,rgba(239,246,255,0.99) 0%,rgba(240,253,244,0.99) 100%)',
-                borderBottom:`1px solid ${border}`, backdropFilter:'blur(14px)',
-                padding:'20px 24px', display:'flex', alignItems:'center', gap:20,
-            }}>
-                <div style={{
-                    width:54, height:54, borderRadius:17, flexShrink:0,
-                    background: allClear ? (isDark ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.1)') : (isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)'),
-                    border:`1.5px solid ${allClear ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`,
-                    display:'flex', alignItems:'center', justifyContent:'center', fontSize:26,
-                    boxShadow:`0 0 24px ${allClear ? 'rgba(16,185,129,0.22)' : 'rgba(239,68,68,0.22)'}`,
-                    animation: allClear ? 'bounce-in 0.5s ease' : 'none',
-                }}>
-                    {allClear ? '🛡️' : '⚠️'}
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                    <h2 style={{ margin:'0 0 4px', fontSize:16, fontWeight:800, color: allClear ? '#10b981' : (isDark ? '#f87171' : '#dc2626') }}>
-                        {allClear
-                            ? 'No Threats Detected'
-                            : `${activeCount} Attack Path${activeCount > 1 ? 's' : ''} Active`}
-                    </h2>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                        <div style={{
-                            width:6, height:6, borderRadius:'50%',
-                            background: allClear ? '#10b981' : '#ef4444',
-                            ...(!allClear ? { animation:'pulse 1.5s ease infinite' } : {}),
-                        }} />
-                        <span style={{ fontSize:12, color:sub }}>
-                            Agent: <span style={{ color: isDark ? '#94a3b8' : '#475569', fontWeight:600 }}>{data.agentId}</span>
-                        </span>
-                    </div>
-                </div>
-                <RiskGauge score={data.riskScore} isDark={isDark} />
-            </div>
-
-            {/* ── Risk bar ─────────────────────────────────────────────── */}
-            <div style={{ height:3, background: isDark ? '#0f172a' : '#e2e8f0', overflow:'hidden' }}>
-                <div style={{
-                    height:'100%', width:`${riskPct}%`,
-                    background: riskPct === 0 ? '#10b981' : riskPct < 60 ? '#f97316' : '#ef4444',
-                    transition:'width 1.2s cubic-bezier(0.4,0,0.2,1)',
-                    boxShadow:`0 0 10px ${riskPct === 0 ? '#10b981' : riskPct < 60 ? '#f97316' : '#ef4444'}`,
-                }} />
-            </div>
-
-            {/* ── Content ──────────────────────────────────────────────── */}
-            <div style={{ padding:'12px 14px 20px' }}>
-
-                {/* All clear */}
-                {allClear && (
-                    <div style={{ padding:'36px 24px', textAlign:'center', animation:'fadeSlideIn 0.4s ease' }}>
-                        <div style={{ fontSize:52, marginBottom:14, animation:'bounce-in 0.5s ease 0.1s both' }}>✅</div>
-                        <p style={{ margin:'0 0 6px', fontSize:16, fontWeight:800, color:'#10b981' }}>
-                            All capability combinations are safe
-                        </p>
-                        <p style={{ margin:'0 0 16px', fontSize:12, color:sub }}>
-                            {fixed.length > 0
-                                ? `${fixed.length} path${fixed.length > 1 ? 's' : ''} remediated this session`
-                                : 'No toxic capability combinations detected'}
-                        </p>
-                        {fixed.length > 0 && (
-                            <button
-                                onClick={() => sendFollowUpMessage(`Show the updated capability graph for ${data.agentId}`)}
+            <div style={{ position:'relative', zIndex:1, padding: 24, maxWidth: 800, margin: '0 auto' }}>
+                <AnimatePresence mode="wait">
+                    {isAllClear ? (
+                        <motion.div key="clear" initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                            style={{
+                                background: card, border: `1px solid rgba(16,185,129,0.3)`,
+                                borderRadius: 24, padding: 48, textAlign: 'center',
+                                backdropFilter: 'blur(20px)', boxShadow: inset
+                            }}
+                        >
+                            <motion.div initial={{ scale: 0 }} animate={{ scale: [0, 1.2, 1] }} transition={{ duration: 0.7, type: "spring" }}
+                                style={{ width: 80, height: 80, borderRadius: 24, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, boxShadow: '0 0 40px rgba(16,185,129,0.2)' }}
+                            >
+                                ✓
+                            </motion.div>
+                            <h2 style={{ margin: '0 0 12px', fontSize: 24, fontWeight: 800, color: '#10b981' }}>All Clear</h2>
+                            <p style={{ margin: '0 0 32px', fontSize: 15, color: sub, lineHeight: 1.6 }}>
+                                No active attack paths detected on <strong>{data.agentId}</strong>.<br/>Policies enforced successfully.
+                            </p>
+                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                                onClick={() => sendFollowUpMessage(`Show the capability graph for ${data.agentId}`)}
                                 style={{
-                                    padding:'10px 20px', borderRadius:12, border:'1.5px solid rgba(16,185,129,0.4)',
-                                    background:'rgba(16,185,129,0.12)', color:'#10b981', fontWeight:700, fontSize:13,
-                                    cursor:'pointer', display:'inline-flex', alignItems:'center', gap:7,
+                                    padding: '14px 28px', borderRadius: 16, border: 'none',
+                                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                                    color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer',
+                                    boxShadow: '0 8px 30px rgba(16,185,129,0.3), inset 0 1px 0 rgba(255,255,255,0.3)'
                                 }}
                             >
-                                🗺️ View updated capability graph
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Attack path cards */}
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                    {data.paths.map((path, i) => {
-                        const isFixed = fixed.includes(path.ruleId);
-                        const isExp   = expanded === path.ruleId;
-                        const isHov   = hovered === path.ruleId;
-                        const s       = SEV[path.severity] ?? SEV.medium;
-
-                        return (
-                            <div
-                                key={path.ruleId}
-                                onClick={() => !isFixed && setExpanded(isExp ? null : path.ruleId)}
-                                onMouseEnter={() => setHovered(path.ruleId)}
-                                onMouseLeave={() => setHovered(null)}
-                                style={{
-                                    borderRadius:15, overflow:'hidden',
-                                    border:`1.5px solid ${isFixed ? border : s.border}`,
-                                    background: isFixed
-                                        ? surface
-                                        : isExp
-                                            ? (isDark ? s.gradient : s.lightGrad)
-                                            : isHov ? (isDark ? 'rgba(30,41,59,0.92)' : 'rgba(248,250,252,0.95)') : card,
-                                    cursor: isFixed ? 'default' : 'pointer',
-                                    opacity: isFixed ? 0.52 : 1,
-                                    transition:'all 0.25s cubic-bezier(0.4,0,0.2,1)',
-                                    boxShadow: isExp && !isFixed
-                                        ? `0 10px 40px ${s.glow}, 0 0 0 1px ${s.border}`
-                                        : isHov && !isFixed
-                                            ? `0 4px 18px ${isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.1)'}`
-                                            : 'none',
-                                    animation:`fadeSlideIn 0.3s ease ${i*0.09}s both`,
-                                }}
-                            >
-                                {/* Card header */}
-                                <div style={{ padding:'14px 16px', display:'flex', alignItems:'center', gap:12 }}>
-                                    <div style={{
-                                        width:8, height:8, borderRadius:'50%', flexShrink:0,
-                                        background: isFixed ? sub : s.color,
-                                        boxShadow: isFixed ? 'none' : `0 0 8px ${s.color}`,
-                                        ...(isFixed || !isExp ? {} : { animation:'pulse 1.5s ease infinite' }),
-                                    }} />
-                                    <span style={{
-                                        fontSize:10, fontWeight:800, padding:'3px 10px', borderRadius:20,
-                                        letterSpacing:0.8, textTransform:'uppercase',
-                                        background: isFixed ? 'transparent' : `${s.color}18`,
-                                        border:`1px solid ${isFixed ? border : `${s.color}60`}`,
-                                        color: isFixed ? sub : s.color, flexShrink:0,
-                                    }}>
-                                        {s.label}
-                                    </span>
-                                    <code style={{ flex:1, fontSize:13, fontWeight:700, color: isFixed ? sub : text, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                                        {path.ruleId}
-                                    </code>
-                                    {isFixed
-                                        ? <span style={{ fontSize:12, fontWeight:700, color:'#10b981', flexShrink:0 }}>✓ Remediated</span>
-                                        : <span style={{ fontSize:20, color:sub, transform: isExp ? 'rotate(180deg)' : 'rotate(0)', transition:'transform 0.2s ease', display:'block', flexShrink:0 }}>⌄</span>
-                                    }
+                                🗺️ View Secured Graph
+                            </motion.button>
+                        </motion.div>
+                    ) : (
+                        <motion.div key="alert" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ staggerChildren: 0.1 }}>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+                                <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 1.5, repeat: Infinity }}
+                                    style={{ width: 56, height: 56, borderRadius: 18, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, boxShadow: '0 0 30px rgba(239,68,68,0.3)', flexShrink: 0 }}
+                                >
+                                    🚨
+                                </motion.div>
+                                <div>
+                                    <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', color: '#ef4444' }}>Threat Detected</h2>
+                                    <p style={{ margin: 0, fontSize: 13, color: sub, fontWeight: 600 }}>
+                                        {activePaths.length} toxic combination{activePaths.length === 1 ? '' : 's'} on <strong style={{ color: text }}>{data.agentId}</strong>
+                                    </p>
                                 </div>
+                            </div>
 
-                                {/* Expanded body */}
-                                {isExp && !isFixed && (
-                                    <div style={{ borderTop:`1px solid ${s.border}40`, padding:'16px 16px 18px', animation:'fadeSlideIn 0.2s ease' }}>
-                                        <p style={{
-                                            margin:'0 0 16px', fontSize:13, color: isDark ? '#cbd5e1' : '#334155',
-                                            lineHeight:1.7, padding:'10px 14px',
-                                            background: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.65)',
-                                            borderRadius:10, border:`1px solid ${border}`,
-                                        }}>
-                                            {path.message}
-                                        </p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                {data.paths.map((path, idx) => {
+                                    const isFixed = fixed.includes(path.ruleId);
+                                    if (isFixed) return null; // We remove it immediately or leave it? Let's remove it for impact.
 
-                                        {/* Tool chain flow diagram */}
-                                        <div style={{ marginBottom:16 }}>
-                                            <p style={{ margin:'0 0 10px', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:1, color:sub }}>
-                                                Tools creating this path
-                                            </p>
-                                            <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:6 }}>
-                                                {path.viaTools.map((t, ti) => {
-                                                    const meta = TOOL_META[t] ?? { emoji:'🔌', color:'#64748b' };
-                                                    return (
-                                                        <span key={t} style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
-                                                            <span style={{
-                                                                padding:'6px 12px', borderRadius:20,
-                                                                background: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.85)',
-                                                                border:`1.5px solid ${meta.color}55`,
-                                                                fontSize:12, fontWeight:700,
-                                                                color: isDark ? '#e2e8f0' : '#1e293b',
-                                                                display:'inline-flex', alignItems:'center', gap:6,
-                                                                boxShadow:`0 0 10px ${meta.color}18`,
-                                                            }}>
-                                                                <span style={{ fontSize:15 }}>{meta.emoji}</span>
-                                                                {t}
-                                                            </span>
-                                                            {ti < path.viaTools.length - 1 && (
-                                                                <span style={{ color:s.color, fontSize:16, fontWeight:700 }}>→</span>
-                                                            )}
-                                                        </span>
-                                                    );
-                                                })}
-                                                <span style={{ display:'inline-flex', alignItems:'center', gap:4, marginLeft:4 }}>
-                                                    <span style={{ color:s.color, fontSize:16, fontWeight:700 }}>→</span>
-                                                    <span style={{
-                                                        padding:'6px 12px', borderRadius:20, fontSize:12, fontWeight:700,
-                                                        background:`${s.color}18`, border:`1.5px solid ${s.color}55`,
-                                                        color:s.color, animation:'pulse 2s ease infinite',
-                                                    }}>
-                                                        ⚠️ Attack Path
-                                                    </span>
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            onClick={(e) => applyFix(e, path.ruleId)}
-                                            disabled={applying === path.ruleId}
+                                    const color = SEV_COLOR[path.severity] ?? '#64748b';
+                                    const isApplying = applying === path.ruleId;
+                                    
+                                    return (
+                                        <motion.div key={path.ruleId} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9, height: 0 }}
                                             style={{
-                                                width:'100%', padding:'13px 20px',
-                                                background: applying === path.ruleId
-                                                    ? (isDark ? '#1e293b' : '#f1f5f9')
-                                                    : `linear-gradient(135deg, ${s.color}, ${s.color}cc)`,
-                                                color: applying === path.ruleId ? sub : '#fff',
-                                                border:'none', borderRadius:12, fontWeight:700, fontSize:13,
-                                                cursor: applying === path.ruleId ? 'not-allowed' : 'pointer',
-                                                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                                                boxShadow: applying === path.ruleId ? 'none' : `0 5px 18px ${s.glow}`,
-                                                transition:'all 0.2s ease', letterSpacing:0.3,
+                                                background: card, border: `1px solid ${color}40`,
+                                                borderRadius: 24, padding: 24,
+                                                backdropFilter: 'blur(20px)',
+                                                boxShadow: `0 20px 40px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 40px ${color}10`,
                                             }}
                                         >
-                                            {applying === path.ruleId
-                                                ? <><span style={{ width:14, height:14, border:`2px solid ${sub}`, borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite', display:'inline-block' }} /> Disconnecting tool…</>
-                                                : '🔧 Disconnect risky tool & fix path'
-                                            }
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
+                                                <div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                                                        <span style={{ fontSize: 11, fontWeight: 900, background: `${color}20`, color, padding: '4px 12px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '0.05em', border: `1px solid ${color}30` }}>
+                                                            {path.severity}
+                                                        </span>
+                                                        <code style={{ fontSize: 16, fontWeight: 800, color: text }}>{path.ruleId}</code>
+                                                    </div>
+                                                    <p style={{ margin: 0, fontSize: 15, color: isDark ? '#cbd5e1' : '#475569', lineHeight: 1.6, fontWeight:500 }}>{path.message}</p>
+                                                </div>
+                                                <div style={{ width: 48, height: 48, borderRadius: 16, background: `${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
+                                                    {path.severity === 'critical' ? '☣️' : '⚠️'}
+                                                </div>
+                                            </div>
 
-            {/* ── Footer ───────────────────────────────────────────────── */}
-            <div style={{ borderTop:`1px solid ${border}`, padding:'10px 20px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <span style={{ fontSize:11, color:sub }}>🔒 Deterministic detection · 0 LLM tokens</span>
-                <span style={{ fontSize:11, fontWeight:600, color: allClear ? '#10b981' : (isDark ? '#f87171' : '#dc2626') }}>
-                    {fixed.length > 0 ? `${fixed.length} fixed` : `${data.paths.length} rule${data.paths.length !== 1 ? 's' : ''} monitored`}
-                </span>
+                                            {/* Circuit Board Tool Chain */}
+                                            <div style={{ padding: 20, borderRadius: 16, background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.03)', border: `1px solid ${border}`, marginBottom: 24, display:'flex', alignItems:'center', gap:0, flexWrap:'wrap' }}>
+                                                {path.viaTools.map((t, ti) => {
+                                                    const m = TOOL_META[t] || { emoji: '🔌', color: '#64748b' };
+                                                    return (
+                                                        <React.Fragment key={t}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: card, borderRadius: 14, border: `1px solid ${border}`, boxShadow: inset }}>
+                                                                <span style={{ fontSize: 20 }}>{m.emoji}</span>
+                                                                <span style={{ fontSize: 13, fontWeight: 800, color: text }}>{t}</span>
+                                                            </div>
+                                                            {ti < path.viaTools.length - 1 && (
+                                                                <div style={{ width: 40, height: 2, background: color, opacity: 0.6, margin: '0 4px' }} />
+                                                            )}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                                <div style={{ width: 40, height: 2, background: color, opacity: 0.6, margin: '0 4px' }} />
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: `${color}15`, borderRadius: 14, border: `1px solid ${color}40` }}>
+                                                    <span style={{ fontSize: 18 }}>🔥</span>
+                                                    <span style={{ fontSize: 13, fontWeight: 800, color }}>Attack Path</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Action Button */}
+                                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                                                onClick={() => applyFix(path.ruleId)} disabled={isApplying}
+                                                style={{
+                                                    width: '100%', padding: '16px', borderRadius: 16, border: 'none',
+                                                    background: isApplying ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)') : `linear-gradient(135deg, ${color}, ${color}dd)`,
+                                                    color: isApplying ? sub : '#fff', transition: 'all 0.2s',
+                                                    fontWeight: 800, fontSize: 15, cursor: isApplying ? 'wait' : 'pointer',
+                                                    boxShadow: isApplying ? 'none' : `0 10px 30px ${color}40, inset 0 1px 0 rgba(255,255,255,0.3)`,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12
+                                                }}
+                                            >
+                                                {isApplying ? (
+                                                    <><span style={{ width: 16, height: 16, border: `2px solid ${sub}`, borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block' }} /> Enforcing Policy...</>
+                                                ) : (
+                                                    <>🔧 Terminate Attack Path</>
+                                                )}
+                                            </motion.button>
+
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );
