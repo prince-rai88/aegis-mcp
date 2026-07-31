@@ -1,406 +1,209 @@
 'use client';
 
-import { useTheme, useMaxHeight, useWidgetSDK } from '@nitrostack/widgets';
-
-// Disable static generation - this is a dynamic widget
 export const dynamic = 'force-dynamic';
-import { Star, MapPin, Globe, Clock, ShieldAlert, Cpu, Heart, ExternalLink } from 'lucide-react';
 
-interface AegisNode {
-    id: string;
-    name: string;
-    description: string;
-    address: string;
-    coords: [number, number];
-    rating: number;
-    reviews: number;
-    priceLevel: 1 | 2 | 3;
-    cuisine: string[];
-    hours: { open: string; close: string };
-    phone: string;
-    website?: string;
-    image: string;
-    specialties: string[];
-    openNow: boolean;
+import { useTheme } from '@nitrostack/widgets';
+
+type Capability = 'READ_PRIVATE_DATA' | 'READ_PUBLIC_DATA' | 'WRITE_DATA' | 'WRITE_PUBLIC' | 'SEND_EXTERNAL' | 'DELETE_DATA' | 'EXECUTE';
+
+interface Tool { id: string; name: string; emoji: string; color: string; caps: Capability[]; }
+
+const TOOL_REGISTRY: Tool[] = [
+    { id:'gmail',      name:'Gmail',      emoji:'📧', color:'#ea4335', caps:['SEND_EXTERNAL','READ_PRIVATE_DATA'] },
+    { id:'dropbox',    name:'Dropbox',    emoji:'📦', color:'#0061ff', caps:['READ_PRIVATE_DATA','WRITE_DATA','SEND_EXTERNAL'] },
+    { id:'postgres',   name:'PostgreSQL', emoji:'🐘', color:'#336791', caps:['READ_PRIVATE_DATA','WRITE_DATA','DELETE_DATA'] },
+    { id:'slack',      name:'Slack',      emoji:'💬', color:'#a855f7', caps:['WRITE_PUBLIC','SEND_EXTERNAL'] },
+    { id:'filesystem', name:'Filesystem', emoji:'🗂️', color:'#f59e0b', caps:['READ_PRIVATE_DATA','WRITE_DATA','EXECUTE'] },
+    { id:'calendar',   name:'Calendar',   emoji:'📅', color:'#10b981', caps:['READ_PRIVATE_DATA','WRITE_DATA'] },
+];
+
+interface PolicyRule { id: string; source: Capability; sink: Capability; severity: 'critical' | 'high'; color: string; icon: string; }
+
+const POLICY_RULES: PolicyRule[] = [
+    { id:'exfiltration', source:'READ_PRIVATE_DATA', sink:'SEND_EXTERNAL',  severity:'critical', color:'#ef4444', icon:'📤' },
+    { id:'public-leak',  source:'READ_PRIVATE_DATA', sink:'WRITE_PUBLIC',   severity:'high',     color:'#f97316', icon:'📢' },
+    { id:'destructive',  source:'DELETE_DATA',        sink:'EXECUTE',        severity:'high',     color:'#f97316', icon:'⚡' },
+];
+
+const CAP_META: Record<Capability, { icon:string; color:string; danger:boolean }> = {
+    READ_PRIVATE_DATA: { icon:'👁️', color:'#ef4444', danger:true  },
+    READ_PUBLIC_DATA:  { icon:'📖', color:'#10b981', danger:false  },
+    WRITE_DATA:        { icon:'✏️', color:'#3b82f6', danger:false  },
+    WRITE_PUBLIC:      { icon:'📢', color:'#eab308', danger:true   },
+    SEND_EXTERNAL:     { icon:'📤', color:'#f97316', danger:true   },
+    DELETE_DATA:       { icon:'🗑️', color:'#ef4444', danger:true   },
+    EXECUTE:           { icon:'⚡', color:'#f97316', danger:true   },
+};
+
+function rulesThatFire(tool: Tool): PolicyRule[] {
+    const caps = new Set(tool.caps);
+    return POLICY_RULES.filter(r => caps.has(r.source) || caps.has(r.sink));
 }
 
-interface WidgetData {
-    shop: AegisNode; // Maps to backend 'shop' output structure
-    relatedShops: AegisNode[]; // Maps to backend 'relatedShops' output structure
+function overallRisk(tool: Tool): 'critical' | 'high' | 'safe' {
+    const rules = rulesThatFire(tool);
+    if (rules.some(r => r.severity === 'critical')) return 'critical';
+    if (rules.length > 0) return 'high';
+    return 'safe';
 }
 
-export default function AegisDetailWidget() {
-    const theme = useTheme();
-    const maxHeight = useMaxHeight();
+export default function ToolRegistry() {
+    const theme  = useTheme();
     const isDark = theme === 'dark';
-    const { isReady, getToolOutput, openExternal } = useWidgetSDK();
 
-    const data = getToolOutput<WidgetData>();
-
-    if (!data) {
-        return (
-            <div style={{
-                padding: '40px',
-                textAlign: 'center',
-                color: isDark ? '#fff' : '#000',
-            }}>
-                Loading node details... {isReady ? '(SDK ready but no data)' : '(waiting for SDK)'}
-            </div>
-        );
-    }
-
-    const { shop, relatedShops } = data;
-
-    // Threat Level definitions
-    const threatConfig = {
-        1: { label: 'Low Threat Level', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
-        2: { label: 'Medium Threat Level', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
-        3: { label: 'High Threat Level', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
-    }[shop.priceLevel] || { label: 'Assessment Pending', color: '#9ca3af', bg: 'rgba(156, 163, 175, 0.15)' };
-
-    const openSandboxSimulator = () => {
-        const url = `https://aegis.security/sandbox/simulate?node=${encodeURIComponent(shop.id)}`;
-        openExternal(url);
-    };
-
-    const triggerAlertEndpoint = () => {
-        openExternal(`https://aegis.security/alerts/channels/${shop.phone}`);
-    };
-
-    const visitDocumentation = () => {
-        if (shop.website) {
-            openExternal(shop.website);
-        }
-    };
+    const bg     = isDark ? '#060b14' : '#f0f4f8';
+    const card   = isDark ? 'rgba(15,23,42,0.82)' : 'rgba(255,255,255,0.92)';
+    const border = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
+    const text   = isDark ? '#f0f9ff' : '#0f172a';
+    const sub    = isDark ? '#64748b' : '#94a3b8';
+    const hr     = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
 
     return (
-        <div style={{
-            background: isDark ? '#0b0f19' : '#f9fafb',
-            minHeight: '500px',
-            maxHeight: maxHeight || '800px',
-            overflow: 'auto',
-        }}>
-            {/* Hero Image */}
-            <div style={{ position: 'relative', height: '240px', overflow: 'hidden' }}>
-                <img
-                    src={shop.image}
-                    alt={shop.name}
-                    style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                    }}
-                />
-                <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(to top, rgba(11, 15, 25, 0.9) 0%, rgba(11, 15, 25, 0.3) 60%, transparent 100%)',
-                }} />
+        <div style={{ background:bg, fontFamily:'Inter, system-ui, sans-serif', color:text, minHeight:'100vh' }}>
+            <style>{`
+                @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.35} }
+            `}</style>
 
-                {/* Overlay Text */}
+            {/* Header */}
+            <div style={{
+                background: isDark
+                    ? 'linear-gradient(135deg,rgba(9,14,28,0.98),rgba(22,18,60,0.98))'
+                    : 'linear-gradient(135deg,rgba(239,246,255,0.99),rgba(240,253,244,0.99))',
+                borderBottom:`1px solid ${border}`, backdropFilter:'blur(14px)', padding:'20px 20px',
+                display:'flex', alignItems:'center', gap:12,
+            }}>
                 <div style={{
-                    position: 'absolute',
-                    bottom: '20px',
-                    left: '20px',
-                    right: '20px',
+                    width:46, height:46, borderRadius:14, fontSize:22,
+                    background:'rgba(245,158,11,0.12)', border:'1.5px solid rgba(245,158,11,0.3)',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    boxShadow:'0 0 20px rgba(245,158,11,0.2)',
                 }}>
-                    <h1 style={{
-                        margin: '0 0 6px 0',
-                        fontSize: '26px',
-                        fontWeight: '800',
-                        color: '#fff',
-                        textShadow: '0 2px 4px rgba(0,0,0,0.6)',
-                    }}>
-                        {shop.name}
-                    </h1>
-                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Star size={18} fill="#fbbf24" stroke="#fbbf24" />
-                            <span style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>
-                                {shop.rating}
-                            </span>
-                            <span style={{ fontSize: '13px', color: '#cbd5e1' }}>
-                                ({shop.reviews} verified audits)
-                            </span>
-                        </div>
-                        <span style={{
-                            backgroundColor: threatConfig.bg,
-                            border: `1px solid ${threatConfig.color}`,
-                            color: threatConfig.color,
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            textTransform: 'uppercase',
-                        }}>
-                            {threatConfig.label}
-                        </span>
-                        {shop.openNow ? (
-                            <span style={{
-                                background: '#10b981',
-                                color: 'white',
-                                padding: '2px 8px',
-                                borderRadius: '10px',
-                                fontSize: '11px',
-                                fontWeight: '705',
-                            }}>
-                                Connected
-                            </span>
-                        ) : (
-                            <span style={{
-                                background: '#6b7280',
-                                color: 'white',
-                                padding: '2px 8px',
-                                borderRadius: '10px',
-                                fontSize: '11px',
-                                fontWeight: '705',
-                            }}>
-                                Offline
-                            </span>
-                        )}
-                    </div>
+                    🗃️
+                </div>
+                <div>
+                    <h2 style={{ margin:'0 0 3px', fontSize:16, fontWeight:800 }}>Tool Registry</h2>
+                    <p style={{ margin:0, fontSize:12, color:sub }}>6 integrations · capability profiles · risk rules</p>
+                </div>
+                <div style={{ marginLeft:'auto', display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+                    <span style={{ fontSize:10, fontWeight:700, padding:'2px 9px', borderRadius:20, background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)', color:'#f87171' }}>
+                        {TOOL_REGISTRY.filter(t => overallRisk(t) === 'critical').length} critical
+                    </span>
+                    <span style={{ fontSize:10, fontWeight:700, padding:'2px 9px', borderRadius:20, background:'rgba(249,115,22,0.12)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c' }}>
+                        {TOOL_REGISTRY.filter(t => overallRisk(t) === 'high').length} high
+                    </span>
                 </div>
             </div>
 
-            {/* Main Content Body */}
-            <div style={{ padding: '20px' }}>
-                {/* Description */}
-                <p style={{
-                    margin: '0 0 20px 0',
-                    fontSize: '15px',
-                    lineHeight: '1.6',
-                    color: isDark ? '#d1d5db' : '#4b5563',
-                }}>
-                    {shop.description}
-                </p>
-
-                {/* Category Tags */}
-                <div style={{ marginBottom: '20px' }}>
-                    <h3 style={{
-                        margin: '0 0 10px 0',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        color: isDark ? '#9ca3af' : '#6b7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.8px',
-                    }}>
-                        Infrastructure Tags
-                    </h3>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {shop.cuisine.map(c => (
-                            <span
-                                key={c}
-                                style={{
-                                    background: isDark ? '#1f2937' : '#f3f4f6',
-                                    color: isDark ? '#f3f4f6' : '#1f2937',
-                                    padding: '6px 12px',
-                                    borderRadius: '16px',
-                                    fontSize: '13px',
-                                    fontWeight: '600',
-                                    border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
-                                }}
-                            >
-                                {c}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Security Measures / Specialties */}
-                <div style={{ marginBottom: '24px' }}>
-                    <h3 style={{
-                        margin: '0 0 10px 0',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        color: isDark ? '#9ca3af' : '#6b7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.8px',
-                    }}>
-                        Security Assertions & Controls
-                    </h3>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {shop.specialties.map(s => (
-                            <span
-                                key={s}
-                                style={{
-                                    background: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
-                                    color: isDark ? '#93c5fd' : '#2563eb',
-                                    padding: '6px 12px',
-                                    borderRadius: '16px',
-                                    fontSize: '13px',
-                                    fontWeight: '600',
-                                    border: `1px solid ${isDark ? '#2563eb' : '#bfdbfe'}`,
-                                }}
-                            >
-                                🛡️ {s}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Security Metrics info card */}
-                <div style={{
-                    background: isDark ? '#111827' : '#fff',
-                    border: `1px solid ${isDark ? '#1f2937' : '#e5e7eb'}`,
-                    borderRadius: '12px',
-                    padding: '16px',
-                    marginBottom: '24px',
-                }}>
-                    <h3 style={{
-                        margin: '0 0 14px 0',
-                        fontSize: '16px',
-                        fontWeight: '700',
-                        color: isDark ? '#fff' : '#111827',
-                    }}>
-                        Node Credentials & Environment
-                    </h3>
-
-                    {/* Address endpoint */}
-                    <div style={{ display: 'flex', alignItems: 'start', gap: '10px', marginBottom: '12px' }}>
-                        <Cpu size={18} style={{ color: isDark ? '#9ca3af' : '#6b7280', marginTop: '2px', flexShrink: 0 }} />
-                        <div style={{ flex: 1 }}>
-                            <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: isDark ? '#e5e7eb' : '#374151', fontFamily: 'monospace' }}>
-                                {shop.address}
-                            </p>
-                            <button
-                                onClick={openSandboxSimulator}
-                                style={{
-                                    padding: '5px 10px',
-                                    background: isDark ? '#1f2937' : '#f3f4f6',
-                                    border: `1px solid ${isDark ? '#374151' : '#d1d5db'}`,
-                                    borderRadius: '6px',
-                                    fontSize: '12px',
-                                    color: isDark ? '#fff' : '#111827',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                }}
-                            >
-                                <ExternalLink size={12} />
-                                Simulate Sandbox Node
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Alert Webhook Routing */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                        <ShieldAlert size={18} style={{ color: isDark ? '#9ca3af' : '#6b7280', flexShrink: 0 }} />
-                        <button
-                            onClick={triggerAlertEndpoint}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                fontSize: '13px',
-                                color: isDark ? '#60a5fa' : '#2563eb',
-                                cursor: 'pointer',
-                                textDecoration: 'underline',
-                                textAlign: 'left',
-                                fontFamily: 'monospace',
-                            }}
-                        >
-                            {shop.phone}
-                        </button>
-                    </div>
-
-                    {/* Documentation website */}
-                    {shop.website && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                            <Globe size={18} style={{ color: isDark ? '#9ca3af' : '#6b7280', flexShrink: 0 }} />
-                            <button
-                                onClick={visitDocumentation}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    fontSize: '13px',
-                                    color: isDark ? '#60a5fa' : '#2563eb',
-                                    cursor: 'pointer',
-                                    textDecoration: 'underline',
-                                    textAlign: 'left',
-                                }}
-                            >
-                                Docs & Security Specification
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Active Scan Hours */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: isDark ? '#cbd5e1' : '#4b5563' }}>
-                        <Clock size={18} style={{ color: isDark ? '#9ca3af' : '#6b7280', flexShrink: 0 }} />
-                        <span>
-                            Inspection Window Window: {shop.hours.open} - {shop.hours.close}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Related Nodes Section */}
-                {relatedShops.length > 0 && (
-                    <div>
-                        <h3 style={{
-                            margin: '0 0 12px 0',
-                            fontSize: '16px',
-                            fontWeight: '700',
-                            color: isDark ? '#fff' : '#111827',
+            <div style={{ padding:'20px 18px 36px', display:'flex', flexDirection:'column', gap:10 }}>
+                {TOOL_REGISTRY.map((tool, i) => {
+                    const risk       = overallRisk(tool);
+                    const triggered  = rulesThatFire(tool);
+                    const riskColor  = risk === 'critical' ? '#ef4444' : risk === 'high' ? '#f97316' : '#10b981';
+                    return (
+                        <div key={tool.id} style={{
+                            background:card, border:`1.5px solid ${risk !== 'safe' ? `${riskColor}35` : border}`,
+                            borderRadius:16, overflow:'hidden', backdropFilter:'blur(12px)',
+                            animation:`fadeUp 0.38s ease ${i*0.07}s both`,
+                            borderLeft: risk !== 'safe' ? `4px solid ${riskColor}` : `4px solid ${border}`,
                         }}>
-                            Alternative / Similar Security Containers
-                        </h3>
-                        <div style={{ display: 'grid', gap: '10px' }}>
-                            {relatedShops.map(related => (
-                                <div
-                                    key={related.id}
-                                    style={{
-                                        background: isDark ? '#111827' : '#fff',
-                                        border: `1px solid ${isDark ? '#1f2937' : '#e5e7eb'}`,
-                                        borderRadius: '12px',
-                                        padding: '12px',
-                                        display: 'flex',
-                                        gap: '12px',
-                                    }}
-                                >
-                                    <img
-                                        src={related.image}
-                                        alt={related.name}
-                                        style={{
-                                            width: '60px',
-                                            height: '60px',
-                                            borderRadius: '8px',
-                                            objectFit: 'cover',
-                                        }}
-                                    />
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <h4 style={{
-                                            margin: '0 0 2px 0',
-                                            fontSize: '14px',
-                                            fontWeight: '700',
-                                            color: isDark ? '#fff' : '#111827',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                        }}>
-                                            {related.name}
-                                        </h4>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                                            <Star size={12} fill="#fbbf24" stroke="#fbbf24" />
-                                            <span style={{ fontSize: '12px', color: isDark ? '#cbd5e1' : '#4b5563' }}>
-                                                {related.rating} (Safety)
-                                            </span>
-                                        </div>
-                                        <p style={{
-                                            margin: 0,
-                                            fontSize: '12px',
-                                            color: isDark ? '#9ca3af' : '#6b7280',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                        }}>
-                                            {related.description}
-                                        </p>
+                            {/* Tool header */}
+                            <div style={{ padding:'16px 18px', display:'flex', alignItems:'center', gap:14 }}>
+                                <div style={{
+                                    width:48, height:48, borderRadius:14, flexShrink:0,
+                                    background:`${tool.color}12`, border:`1.5px solid ${tool.color}30`,
+                                    display:'flex', alignItems:'center', justifyContent:'center',
+                                    fontSize:24, boxShadow:`0 0 18px ${tool.color}18`,
+                                }}>
+                                    {tool.emoji}
+                                </div>
+                                <div style={{ flex:1 }}>
+                                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                                        <span style={{ fontSize:15, fontWeight:800, color: isDark ? '#e2e8f0' : '#1e293b' }}>{tool.name}</span>
+                                        <code style={{ fontSize:11, color:sub, fontFamily:'monospace' }}>{tool.id}</code>
+                                    </div>
+                                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                        <span style={{ width:6, height:6, borderRadius:'50%', background:tool.color, boxShadow:`0 0 5px ${tool.color}`, display:'inline-block' }} />
+                                        <span style={{ fontSize:11, color:sub }}>{tool.caps.length} capabilities</span>
                                     </div>
                                 </div>
-                            ))}
+                                <span style={{
+                                    fontSize:10, fontWeight:800, padding:'4px 11px', borderRadius:20,
+                                    textTransform:'uppercase', letterSpacing:0.7,
+                                    background:`${riskColor}15`, border:`1.5px solid ${riskColor}45`,
+                                    color:riskColor,
+                                    ...(risk !== 'safe' ? { animation:'pulse 2.5s ease infinite' } : {}),
+                                }}>
+                                    {risk}
+                                </span>
+                            </div>
+
+                            {/* Capabilities */}
+                            <div style={{ padding:'0 18px 14px' }}>
+                                <p style={{ margin:'0 0 8px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:1.1, color:sub }}>
+                                    Grants
+                                </p>
+                                <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginBottom: triggered.length > 0 ? 14 : 0 }}>
+                                    {tool.caps.map(cap => {
+                                        const m = CAP_META[cap];
+                                        return (
+                                            <span key={cap} style={{
+                                                fontSize:11, fontWeight:700, padding:'5px 11px', borderRadius:20,
+                                                background:`${m.color}${m.danger ? '14' : '09'}`,
+                                                border:`1.5px solid ${m.color}${m.danger ? '45' : '28'}`,
+                                                color:m.color, display:'inline-flex', alignItems:'center', gap:5,
+                                                ...(m.danger ? { animation:'pulse 3s ease infinite' } : {}),
+                                            }}>
+                                                {m.icon}{' '}{cap.replace(/_/g,' ')}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Triggered rules */}
+                                {triggered.length > 0 && (
+                                    <>
+                                        <div style={{ height:1, background:hr, marginBottom:12 }} />
+                                        <p style={{ margin:'0 0 8px', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:1.1, color:sub }}>
+                                            Triggers if connected with…
+                                        </p>
+                                        <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                                            {triggered.map(rule => (
+                                                <div key={rule.id} style={{
+                                                    display:'flex', alignItems:'center', gap:8, padding:'7px 11px',
+                                                    borderRadius:9, background:`${rule.color}09`, border:`1px solid ${rule.color}30`,
+                                                }}>
+                                                    <span style={{ fontSize:14 }}>{rule.icon}</span>
+                                                    <span style={{ fontSize:11, fontWeight:700, color:rule.color }}>{rule.id}</span>
+                                                    <span style={{ fontSize:11, color:sub, flex:1 }}>
+                                                        <code style={{ fontSize:10 }}>{rule.source}</code>
+                                                        <span style={{ color:rule.color, margin:'0 4px' }}>→</span>
+                                                        <code style={{ fontSize:10 }}>{rule.sink}</code>
+                                                    </span>
+                                                    <span style={{
+                                                        fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:20,
+                                                        background:`${rule.color}18`, border:`1px solid ${rule.color}40`,
+                                                        color:rule.color, textTransform:'uppercase', letterSpacing:0.5,
+                                                    }}>
+                                                        {rule.severity}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    );
+                })}
+            </div>
+
+            {/* Footer */}
+            <div style={{ borderTop:`1px solid ${border}`, padding:'12px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', background: isDark ? 'rgba(6,11,20,0.9)' : 'rgba(240,244,248,0.9)', backdropFilter:'blur(8px)' }}>
+                <span style={{ fontSize:11, color:sub }}>🔒 Aegis Tool Registry · Static capability model</span>
+                <span style={{ fontSize:11, fontWeight:600, color:sub }}>
+                    {POLICY_RULES.length} policy rules · {TOOL_REGISTRY.length} integrations
+                </span>
             </div>
         </div>
     );
