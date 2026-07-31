@@ -1,16 +1,16 @@
 import { McpApp, Module, ConfigModule } from '@nitrostack/core';
-import { PizzazModule } from './modules/pizzaz/pizzaz.module.js';
+import { AegisModule } from './modules/aegis/aegis.module.js';
 
 /**
  * Root Application Module
  * 
- * Pizza shop finder with interactive maps.
- * Showcases NitroStack Widget SDK features.
+ * Aegis AI Agent Security Platform MCP Server.
+ * Analyzes security capabilities and models agent safety risk paths.
  */
 @McpApp({
     module: AppModule,
     server: {
-        name: 'pizzaz-finder',
+        name: 'aegis-security-server',
         version: '1.0.0'
     },
     logging: {
@@ -18,11 +18,11 @@ import { PizzazModule } from './modules/pizzaz/pizzaz.module.js';
     }
 })
 @Module({
-    name: 'pizzaz',
-    description: 'Pizza shop finder with interactive maps',
+    name: 'aegis',
+    description: 'Aegis AI Agent Security Platform MCP Server',
     imports: [
         ConfigModule.forRoot(),
-        PizzazModule
+        AegisModule
     ],
 })
 export class AppModule { }

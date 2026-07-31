@@ -1,16 +1,16 @@
 'use client';
 
-import { useTheme, useWidgetState, useMaxHeight, useDisplayMode, useWidgetSDK } from '@nitrostack/widgets';
+import { useTheme, useWidgetState, useMaxHeight, useWidgetSDK } from '@nitrostack/widgets';
 
 // Disable static generation - this is a dynamic widget
 export const dynamic = 'force-dynamic';
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { CompactShopCard } from '../../components/CompactShopCard';
+import { CompactCapabilityCard } from '../../components/CompactCapabilityCard';
 import { Maximize2 } from 'lucide-react';
 
-interface PizzaShop {
+interface AegisNode {
     id: string;
     name: string;
     description: string;
@@ -29,50 +29,40 @@ interface PizzaShop {
 }
 
 interface WidgetData {
-    shops: PizzaShop[];
+    shops: AegisNode[]; // Maps to backend 'shops' output structure
     filter: string;
     totalShops: number;
 }
 
-export default function PizzaMapWidget() {
+export default function AegisMapWidget() {
     const theme = useTheme();
     const maxHeight = useMaxHeight();
-    const displayMode = useDisplayMode();
     const isDark = theme === 'dark';
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<mapboxgl.Map | null>(null);
-    const [selectedShop, setSelectedShop] = useState<PizzaShop | null>(null);
+    const [selectedNode, setSelectedNode] = useState<AegisNode | null>(null);
 
     const { isReady, getToolOutput, callTool, requestFullscreen } = useWidgetSDK();
 
     // Access tool output
     const data = getToolOutput<WidgetData>();
 
-    // Persistent state
-    const [state, setState] = useWidgetState<{
-        favorites: string[];
-    }>(() => ({
-        favorites: [],
-    }));
-
     useEffect(() => {
         if (!mapContainer.current || !data || map.current) return;
 
-        // Initialize Mapbox
         const initMap = async () => {
             try {
-                // Set your Mapbox token here
                 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
                 const mapInstance = new mapboxgl.Map({
                     container: mapContainer.current!,
-                    style: isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12',
+                    style: isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v14',
                     center: data.shops[0]?.coords || [-122.4194, 37.7749],
                     zoom: 12,
                 });
 
                 // Add markers
-                data.shops.forEach(shop => {
+                data.shops.forEach(node => {
                     const el = document.createElement('div');
                     el.className = 'marker';
                     el.style.backgroundImage = 'url(https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png)';
@@ -82,18 +72,17 @@ export default function PizzaMapWidget() {
                     el.style.cursor = 'pointer';
 
                     el.addEventListener('click', () => {
-                        setSelectedShop(shop);
+                        setSelectedNode(node);
                     });
 
                     new mapboxgl.Marker(el)
-                        .setLngLat(shop.coords)
+                        .setLngLat(node.coords)
                         .addTo(mapInstance);
                 });
 
-                // Fit bounds to show all markers
                 if (data.shops.length > 1) {
                     const bounds = new mapboxgl.LngLatBounds();
-                    data.shops.forEach(shop => bounds.extend(shop.coords));
+                    data.shops.forEach(node => bounds.extend(node.coords));
                     mapInstance.fitBounds(bounds, { padding: 50 });
                 }
 
@@ -119,25 +108,21 @@ export default function PizzaMapWidget() {
                 textAlign: 'center',
                 color: isDark ? '#fff' : '#000',
             }}>
-                Loading map... {isReady ? '(SDK ready but no data)' : '(waiting for SDK)'}
+                Loading security graph... {isReady ? '(SDK ready but no data)' : '(waiting for SDK)'}
             </div>
         );
     }
 
-    const handleShopClick = async (shopId: string) => {
-        // Call the show_pizza_shop tool to show shop details
-        await callTool('show_pizza_shop', { shopId });
-    };
-
-    const requestFullscreenMode = async () => {
-        await requestFullscreen();
+    const handleNodeClick = async (nodeId: string) => {
+        // Call the show_capability_details tool to show node details
+        await callTool('show_capability_details', { shopId: nodeId });
     };
 
     return (
         <div style={{
             position: 'relative',
             height: maxHeight || '650px',
-            background: isDark ? '#0a0a0a' : '#f9fafb',
+            background: isDark ? '#0b0f19' : '#f9fafb',
             overflow: 'hidden',
         }}>
             {/* Map Container - Full Screen */}
@@ -157,24 +142,24 @@ export default function PizzaMapWidget() {
                     top: '16px',
                     right: '16px',
                     padding: '10px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    border: 'none',
+                    background: isDark ? '#1f2937' : '#ffffff',
+                    border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
                     borderRadius: '8px',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     zIndex: 10,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                 }}
             >
-                <Maximize2 size={18} style={{ color: '#111' }} />
+                <Maximize2 size={18} style={{ color: isDark ? '#fff' : '#111' }} />
             </button>
 
-            {/* Overlay Shop Cards - Bottom */}
+            {/* Overlay Node Cards - Bottom */}
             <div style={{
                 position: 'absolute',
-                bottom: '8px',
+                bottom: '12px',
                 left: '16px',
                 right: '16px',
                 zIndex: 5,
@@ -190,20 +175,20 @@ export default function PizzaMapWidget() {
                     gap: '12px',
                     paddingBottom: '8px',
                 }}>
-                    {data.shops.map(shop => (
+                    {data.shops.map(node => (
                         <div
-                            key={shop.id}
+                            key={node.id}
                             style={{
                                 scrollSnapAlign: 'start',
                                 flexShrink: 0,
                             }}
                         >
-                            <CompactShopCard
-                                shop={shop}
-                                isSelected={selectedShop?.id === shop.id}
+                            <CompactCapabilityCard
+                                shop={node}
+                                isSelected={selectedNode?.id === node.id}
                                 onClick={() => {
-                                    setSelectedShop(shop);
-                                    handleShopClick(shop.id);
+                                    setSelectedNode(node);
+                                    handleNodeClick(node.id);
                                 }}
                                 isDark={isDark}
                             />

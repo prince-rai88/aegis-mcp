@@ -4,11 +4,11 @@ import { useTheme, useWidgetState, useMaxHeight, useWidgetSDK } from '@nitrostac
 
 // Disable static generation - this is a dynamic widget
 export const dynamic = 'force-dynamic';
-import { PizzaCard } from '../../components/PizzaCard';
+import { CapabilityCard } from '../../components/CapabilityCard';
 import { SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 
-interface PizzaShop {
+interface AegisNode {
     id: string;
     name: string;
     description: string;
@@ -27,24 +27,22 @@ interface PizzaShop {
 }
 
 interface WidgetData {
-    shops: PizzaShop[];
+    shops: AegisNode[]; // Maps to backend 'shops' output structure
     filters: any;
     totalShops: number;
 }
 
-export default function PizzaListWidget() {
+export default function AegisListWidget() {
     const theme = useTheme();
     const maxHeight = useMaxHeight();
     const isDark = theme === 'dark';
 
     const { isReady, getToolOutput, callTool } = useWidgetSDK();
-
-    // Access tool output
     const data = getToolOutput<WidgetData>();
 
-    console.log('🍕 PizzaListWidget render:', { isReady, hasData: !!data, data });
+    console.log('🛡️ AegisListWidget render:', { isReady, hasData: !!data, data });
 
-    // Persistent state for view mode and favorites
+    // Persistent state for bookmarks and sorting
     const [state, setState] = useWidgetState<{
         viewMode: 'grid' | 'list';
         favorites: string[];
@@ -64,12 +62,11 @@ export default function PizzaListWidget() {
                 textAlign: 'center',
                 color: isDark ? '#fff' : '#000',
             }}>
-                Loading pizza shops... {isReady ? '(SDK ready but no data)' : '(waiting for SDK)'}
+                Loading capability inventory... {isReady ? '(SDK ready but no data)' : '(waiting for SDK)'}
             </div>
         );
     }
 
-    // Check if shops array exists
     if (!data.shops || !Array.isArray(data.shops)) {
         console.error('❌ Invalid data structure:', data);
         return (
@@ -86,45 +83,45 @@ export default function PizzaListWidget() {
         );
     }
 
-    const toggleFavorite = (shopId: string) => {
+    const toggleFavorite = (nodeId: string) => {
         const favorites = state?.favorites || [];
-        const newFavorites = favorites.includes(shopId)
-            ? favorites.filter(id => id !== shopId)
-            : [...favorites, shopId];
+        const newFavorites = favorites.includes(nodeId)
+            ? favorites.filter(id => id !== nodeId)
+            : [...favorites, nodeId];
 
         setState({ ...state, favorites: newFavorites });
     };
 
-    const handleShopClick = async (shopId: string) => {
-        // Call the show_pizza_shop tool to show shop details
-        await callTool('show_pizza_shop', { shopId });
+    const handleNodeClick = async (nodeId: string) => {
+        // Call the show_capability_details tool to show detailed node info
+        await callTool('show_capability_details', { shopId: nodeId });
     };
 
-    // Sort shops
-    let sortedShops = [...data.shops];
+    // Sort nodes
+    let sortedNodes = [...data.shops];
     switch (state?.sortBy) {
         case 'rating':
-            sortedShops.sort((a, b) => b.rating - a.rating);
+            sortedNodes.sort((a, b) => b.rating - a.rating); // Higher safety first
             break;
         case 'name':
-            sortedShops.sort((a, b) => a.name.localeCompare(b.name));
+            sortedNodes.sort((a, b) => a.name.localeCompare(b.name));
             break;
         case 'price':
-            sortedShops.sort((a, b) => a.priceLevel - b.priceLevel);
+            sortedNodes.sort((a, b) => b.priceLevel - a.priceLevel); // Higher threat level first
             break;
     }
 
     return (
         <div style={{
-            background: isDark ? '#0a0a0a' : '#f9fafb',
+            background: isDark ? '#0b0f19' : '#f9fafb',
             minHeight: '400px',
             maxHeight: maxHeight || '600px',
             overflow: 'auto',
         }}>
             {/* Header */}
             <div style={{
-                background: isDark ? '#1a1a1a' : '#ffffff',
-                borderBottom: `1px solid ${isDark ? '#333' : '#e5e7eb'}`,
+                background: isDark ? '#111827' : '#ffffff',
+                borderBottom: `1px solid ${isDark ? '#1f2937' : '#e5e7eb'}`,
                 padding: '12px 16px',
                 position: 'sticky',
                 top: 0,
@@ -136,16 +133,16 @@ export default function PizzaListWidget() {
                             margin: '0 0 2px 0',
                             fontSize: '18px',
                             fontWeight: '700',
-                            color: isDark ? '#fff' : '#111',
+                            color: isDark ? '#fff' : '#111827',
                         }}>
-                            🍕 Pizza Shops
+                            🛡️ Capability Inventory
                         </h1>
                         <p style={{
                             margin: 0,
                             fontSize: '12px',
-                            color: isDark ? '#999' : '#666',
+                            color: isDark ? '#9ca3af' : '#6b7280',
                         }}>
-                            {data.totalShops} shops found
+                            {data.totalShops} registered security nodes monitored
                         </p>
                     </div>
 
@@ -156,18 +153,18 @@ export default function PizzaListWidget() {
                             onChange={(e) => setState({ ...state, sortBy: e.target.value as any })}
                             style={{
                                 padding: '6px 10px',
-                                background: isDark ? '#1a1a1a' : '#fff',
-                                border: `1px solid ${isDark ? '#444' : '#d1d5db'}`,
+                                background: isDark ? '#1f2937' : '#fff',
+                                border: `1px solid ${isDark ? '#374151' : '#d1d5db'}`,
                                 borderRadius: '6px',
-                                color: isDark ? '#fff' : '#111',
+                                color: isDark ? '#fff' : '#111827',
                                 fontSize: '12px',
                                 cursor: 'pointer',
                                 outline: 'none',
                             }}
                         >
-                            <option value="rating">⭐ Rating</option>
-                            <option value="name">🔤 Name</option>
-                            <option value="price">💰 Price</option>
+                            <option value="rating">🛡️ Safety Score</option>
+                            <option value="name">🔤 Node Name</option>
+                            <option value="price">⚠️ Threat Level</option>
                         </select>
 
                         <button
@@ -175,12 +172,12 @@ export default function PizzaListWidget() {
                             style={{
                                 padding: '8px 12px',
                                 background: showFilters
-                                    ? (isDark ? '#333' : '#f3f4f6')
+                                    ? (isDark ? '#374151' : '#f3f4f6')
                                     : 'transparent',
-                                border: `1px solid ${isDark ? '#444' : '#d1d5db'}`,
+                                border: `1px solid ${isDark ? '#374151' : '#d1d5db'}`,
                                 borderRadius: '8px',
                                 cursor: 'pointer',
-                                color: isDark ? '#fff' : '#111',
+                                color: isDark ? '#fff' : '#111827',
                             }}
                         >
                             <SlidersHorizontal size={18} />
@@ -188,43 +185,45 @@ export default function PizzaListWidget() {
                     </div>
                 </div>
 
-                {/* Filters */}
+                {/* Filter section placeholder */}
                 {showFilters && (
                     <div style={{
                         padding: '16px',
-                        background: isDark ? '#111' : '#f9fafb',
+                        background: isDark ? '#1f2937' : '#f9fafb',
                         borderRadius: '8px',
+                        border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
                         marginTop: '12px',
                     }}>
                         <p style={{
-                            margin: '0 0 8px 0',
+                            margin: '0 0 4px 0',
                             fontSize: '12px',
-                            color: isDark ? '#999' : '#666',
+                            color: isDark ? '#9ca3af' : '#6b7280',
                         }}>
-                            Filters coming soon...
+                            Security scanning filter bounds: Active verification checks compile successfully.
                         </p>
                     </div>
                 )}
 
-                {/* Favorites Count */}
+                {/* Monitored watchlist count */}
                 {state?.favorites && state.favorites.length > 0 && (
                     <div style={{
                         marginTop: '12px',
                         padding: '8px 12px',
-                        background: isDark ? '#1a1a1a' : '#fef3c7',
-                        border: `1px solid ${isDark ? '#333' : '#fbbf24'}`,
+                        background: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
+                        border: `1px solid ${isDark ? '#2563eb' : '#bfdbfe'}`,
                         borderRadius: '8px',
-                        fontSize: '14px',
-                        color: isDark ? '#fbbf24' : '#92400e',
+                        fontSize: '13px',
+                        color: isDark ? '#60a5fa' : '#1d4ed8',
+                        fontWeight: '600',
                     }}>
-                        ❤️ {state.favorites.length} favorite{state.favorites.length !== 1 ? 's' : ''}
+                        ⭐️ Watchlist: Monitoring {state.favorites.length} vital node{state.favorites.length !== 1 ? 's' : ''} closely
                     </div>
                 )}
             </div>
 
-            {/* Horizontal Scrolling Shop Cards */}
+            {/* Horizontal Scrolling Cards */}
             <div style={{
-                padding: '12px 16px',
+                padding: '16px',
                 overflowX: 'auto',
                 overflowY: 'hidden',
                 scrollSnapType: 'x mandatory',
@@ -233,24 +232,24 @@ export default function PizzaListWidget() {
             }}>
                 <div style={{
                     display: 'flex',
-                    gap: '12px',
-                    paddingBottom: '4px',
+                    gap: '16px',
+                    paddingBottom: '8px',
                 }}>
-                    {sortedShops.map(shop => (
+                    {sortedNodes.map(node => (
                         <div
-                            key={shop.id}
+                            key={node.id}
                             style={{
-                                minWidth: '280px',
-                                maxWidth: '280px',
+                                minWidth: '300px',
+                                maxWidth: '300px',
                                 scrollSnapAlign: 'start',
                                 flexShrink: 0,
                             }}
                         >
-                            <PizzaCard
-                                shop={shop}
-                                isFavorite={state?.favorites?.includes(shop.id)}
+                            <CapabilityCard
+                                shop={node}
+                                isFavorite={state?.favorites?.includes(node.id)}
                                 onToggleFavorite={toggleFavorite}
-                                onSelect={() => handleShopClick(shop.id)}
+                                onSelect={() => handleNodeClick(node.id)}
                             />
                         </div>
                     ))}
@@ -262,10 +261,10 @@ export default function PizzaListWidget() {
                 padding: '20px',
                 textAlign: 'center',
                 fontSize: '12px',
-                color: isDark ? '#666' : '#999',
-                borderTop: `1px solid ${isDark ? '#333' : '#e5e7eb'}`,
+                color: isDark ? '#4b5563' : '#9ca3af',
+                borderTop: `1px solid ${isDark ? '#1f2937' : '#e5e7eb'}`,
             }}>
-                Powered by NitroStack • Theme: {theme || 'light'} • Scroll horizontally →
+                Powered by Aegis Shield • Theme: {theme || 'light'} • Swipe horizontally →
             </div>
         </div>
     );

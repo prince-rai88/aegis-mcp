@@ -1,6 +1,6 @@
 'use client';
 
-interface PizzaShop {
+interface AegisNode {
     id: string;
     name: string;
     description: string;
@@ -18,15 +18,16 @@ interface PizzaShop {
     openNow: boolean;
 }
 
-interface CompactShopCardProps {
-    shop: PizzaShop;
+interface CompactCapabilityCardProps {
+    shop: AegisNode; // Keep property name 'shop' to preserve event contract
     isSelected: boolean;
     onClick: () => void;
     isDark?: boolean;
 }
 
-export function CompactShopCard({ shop, isSelected, onClick, isDark = true }: CompactShopCardProps) {
-    const priceSymbol = '$'.repeat(shop.priceLevel);
+export function CompactCapabilityCard({ shop, isSelected, onClick, isDark = true }: CompactCapabilityCardProps) {
+    const threatLabel = { 1: 'Low Threat', 2: 'Med Threat', 3: 'High Threat' }[shop.priceLevel] || 'Risk';
+    const threatColor = { 1: '#10b981', 2: '#f59e0b', 3: '#ef4444' }[shop.priceLevel] || '#9ca3af';
 
     return (
         <div
@@ -35,30 +36,28 @@ export function CompactShopCard({ shop, isSelected, onClick, isDark = true }: Co
                 display: 'flex',
                 gap: '12px',
                 padding: '12px',
-                background: isSelected
-                    ? 'rgba(255, 255, 255, 0.95)'
-                    : 'rgba(255, 255, 255, 0.9)',
+                background: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                 backdropFilter: 'blur(10px)',
                 borderRadius: '12px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
-                border: isSelected ? '2px solid #3b82f6' : '2px solid transparent',
+                border: isSelected ? '2px solid #3b82f6' : `2px solid ${isDark ? '#4b5563' : 'transparent'}`,
                 boxShadow: isSelected
-                    ? '0 4px 12px rgba(59, 130, 246, 0.3)'
-                    : '0 2px 8px rgba(0, 0, 0, 0.1)',
+                    ? '0 4px 16px rgba(59, 130, 246, 0.4)'
+                    : '0 2px 8px rgba(0, 0, 0, 0.2)',
                 minWidth: '280px',
                 maxWidth: '280px',
             }}
             onMouseEnter={(e) => {
                 if (!isSelected) {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.25)';
                 }
             }}
             onMouseLeave={(e) => {
                 if (!isSelected) {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
                 }
             }}
         >
@@ -67,8 +66,8 @@ export function CompactShopCard({ shop, isSelected, onClick, isDark = true }: Co
                 src={shop.image}
                 alt={shop.name}
                 style={{
-                    width: '80px',
-                    height: '80px',
+                    width: '70px',
+                    height: '70px',
                     borderRadius: '8px',
                     objectFit: 'cover',
                     flexShrink: 0,
@@ -87,8 +86,8 @@ export function CompactShopCard({ shop, isSelected, onClick, isDark = true }: Co
                 <h4 style={{
                     margin: 0,
                     fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#111',
+                    fontWeight: '700',
+                    color: isDark ? '#fff' : '#111',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -98,9 +97,9 @@ export function CompactShopCard({ shop, isSelected, onClick, isDark = true }: Co
 
                 {/* Description */}
                 <p style={{
-                    margin: '4px 0',
+                    margin: '2px 0 4px 0',
                     fontSize: '12px',
-                    color: '#666',
+                    color: isDark ? '#d1d5db' : '#555',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -108,32 +107,42 @@ export function CompactShopCard({ shop, isSelected, onClick, isDark = true }: Co
                     {shop.description}
                 </p>
 
-                {/* Rating & Price */}
+                {/* Safety Score & Threat Level */}
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '12px',
+                    gap: '6px',
+                    fontSize: '11px',
                 }}>
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                         <span style={{ color: '#fbbf24' }}>⭐</span>
-                        <span style={{ fontWeight: '600', color: '#111' }}>{shop.rating}</span>
+                        <span style={{ fontWeight: '600', color: isDark ? '#fff' : '#111' }}>{shop.rating}</span>
                     </div>
-                    <span style={{ color: '#999' }}>•</span>
-                    <span style={{ color: '#666' }}>{priceSymbol}</span>
-                    {shop.openNow && (
+                    <span style={{ color: isDark ? '#4b5563' : '#ccc' }}>•</span>
+                    <span style={{
+                        color: threatColor,
+                        fontWeight: '700',
+                    }}>
+                        {threatLabel}
+                    </span>
+                    {shop.openNow ? (
                         <>
-                            <span style={{ color: '#999' }}>•</span>
+                            <span style={{ color: isDark ? '#4b5563' : '#ccc' }}>•</span>
                             <span style={{
                                 color: '#10b981',
                                 fontWeight: '600',
-                                fontSize: '11px',
                             }}>
-                                Open Now
+                                Connected
+                            </span>
+                        </>
+                    ) : (
+                        <>
+                            <span style={{ color: isDark ? '#4b5563' : '#ccc' }}>•</span>
+                            <span style={{
+                                color: '#ef4444',
+                                fontWeight: '600',
+                            }}>
+                                Offline
                             </span>
                         </>
                     )}
