@@ -209,18 +209,23 @@ export class GovernanceTools {
                 return { error: `No active attack path found for rule '${args.ruleId}' on agent '${args.agentId}'` };
             }
 
-            const toolToRemove =
-                target.viaTools.find((toolId) => TOOL_REGISTRY[toolId]?.includes(target.sink as Capability)) ??
-                target.viaTools[0];
-            if (toolToRemove) {
-                disconnectTool(args.agentId, toolToRemove);
+            // Disconnect every currently-connected tool that supplies the riskier
+            // (sink) capability. A single-tool removal isn't guaranteed to clear the
+            // rule when more than one connected tool independently supplies the sink
+            // (e.g. both gmail and dropbox grant SEND_EXTERNAL) — removing all of
+            // them for this sink is what actually guarantees the rule stops firing.
+            const removedTools = getAgentTools(args.agentId).filter((toolId) =>
+                TOOL_REGISTRY[toolId]?.includes(target.sink as Capability)
+            );
+            for (const toolId of removedTools) {
+                disconnectTool(args.agentId, toolId);
             }
 
             const graph = buildCapabilityGraph(args.agentId);
             ctx.logger.info('Applied policy fix', {
                 agentId: args.agentId,
                 ruleId: args.ruleId,
-                removedTool: toolToRemove,
+                removedTools,
             });
             return graph;
         } catch (error) {
