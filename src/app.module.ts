@@ -1,16 +1,16 @@
 import { McpApp, Module, ConfigModule } from '@nitrostack/core';
-import { PizzazModule } from './modules/pizzaz/pizzaz.module.js';
+import { GovernanceModule } from './modules/governance/governance.module.js';
 
 /**
  * Root Application Module
- * 
- * Pizza shop finder with interactive maps.
- * Showcases NitroStack Widget SDK features.
+ *
+ * Aegis — audits an AI agent's effective permissions and detects toxic
+ * capability combinations (a "blast-radius" auditor).
  */
 @McpApp({
     module: AppModule,
     server: {
-        name: 'pizzaz-finder',
+        name: 'aegis',
         version: '1.0.0'
     },
     logging: {
@@ -18,11 +18,11 @@ import { PizzazModule } from './modules/pizzaz/pizzaz.module.js';
     }
 })
 @Module({
-    name: 'pizzaz',
-    description: 'Pizza shop finder with interactive maps',
+    name: 'aegis',
+    description: 'Aegis — blast-radius auditor for AI agent tool permissions',
     imports: [
         ConfigModule.forRoot(),
-        PizzazModule
+        GovernanceModule
     ],
 })
 export class AppModule { }
