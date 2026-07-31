@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useWidgetSDK, useTheme } from '@nitrostack/widgets';
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AttackPath { ruleId: string; source: string; sink: string; viaTools: string[]; severity: 'critical' | 'high' | 'medium'; message: string; }
@@ -157,7 +157,7 @@ export default function AttackPathAlert() {
                                                 {path.viaTools.map((t, ti) => {
                                                     const m = TOOL_META[t] || { emoji: '🔌', color: '#64748b' };
                                                     return (
-                                                        <React.Fragment key={t}>
+                                                        <Fragment key={t}>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: card, borderRadius: 14, border: `1px solid ${border}`, boxShadow: inset }}>
                                                                 <span style={{ fontSize: 20 }}>{m.emoji}</span>
                                                                 <span style={{ fontSize: 13, fontWeight: 800, color: text }}>{t}</span>
@@ -165,7 +165,7 @@ export default function AttackPathAlert() {
                                                             {ti < path.viaTools.length - 1 && (
                                                                 <div style={{ width: 40, height: 2, background: color, opacity: 0.6, margin: '0 4px' }} />
                                                             )}
-                                                        </React.Fragment>
+                                                        </Fragment>
                                                     );
                                                 })}
                                                 <div style={{ width: 40, height: 2, background: color, opacity: 0.6, margin: '0 4px' }} />
