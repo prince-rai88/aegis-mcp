@@ -1,16 +1,16 @@
 import { McpApp, Module, ConfigModule } from '@nitrostack/core';
-import { AegisModule } from './modules/aegis/aegis.module.js';
+import { GovernanceModule } from './modules/governance/governance.module.js';
 
 /**
  * Root Application Module
- * 
- * Aegis AI Agent Security Platform MCP Server.
- * Analyzes security capabilities and models agent safety risk paths.
+ *
+ * Aegis — audits an AI agent's effective permissions and detects toxic
+ * capability combinations (a "blast-radius" auditor).
  */
 @McpApp({
     module: AppModule,
     server: {
-        name: 'aegis-security-server',
+        name: 'aegis',
         version: '1.0.0'
     },
     logging: {
@@ -19,10 +19,10 @@ import { AegisModule } from './modules/aegis/aegis.module.js';
 })
 @Module({
     name: 'aegis',
-    description: 'Aegis AI Agent Security Platform MCP Server',
+    description: 'Aegis — blast-radius auditor for AI agent tool permissions',
     imports: [
         ConfigModule.forRoot(),
-        AegisModule
+        GovernanceModule
     ],
 })
 export class AppModule { }
