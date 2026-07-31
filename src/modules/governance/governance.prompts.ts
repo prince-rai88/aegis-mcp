@@ -66,7 +66,7 @@ export class GovernancePrompts {
                 ],
             });
 
-            explanation = response.choices[0]?.message?.content ?? attackPath.message;
+            explanation = response.choices[0]?.message?.content ?? attackPath.message ?? '';
             explanationCache.set(key, explanation);
         } else {
             ctx.logger.info('Serving cached attack path explanation', {
