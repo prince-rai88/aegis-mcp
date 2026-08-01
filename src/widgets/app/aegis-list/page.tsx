@@ -53,6 +53,12 @@ export default function AgentInspector() {
         } finally { setLoading(false); }
     };
 
+    const runFollowUp = (prompt: string) => {
+        sendFollowUpMessage(prompt).catch(() => {
+            setError('This action needs a connected host — open this project in NitroStack Studio or a chat client to run it live.');
+        });
+    };
+
     const bg     = isDark ? '#060b14' : '#f0f4f8';
     const card   = isDark ? 'rgba(15,23,42,0.8)' : 'rgba(255,255,255,0.92)';
     const border = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
@@ -299,7 +305,7 @@ export default function AgentInspector() {
                                                 </div>
                                                 <p style={{ margin:'0 0 10px', fontSize:12, color:sub, lineHeight:1.55 }}>{path.message}</p>
                                                 <button
-                                                    onClick={() => sendFollowUpMessage(`Fix the ${path.ruleId} path on ${graphData.agentId}`)}
+                                                    onClick={() => runFollowUp(`Fix the ${path.ruleId} path on ${graphData.agentId}`)}
                                                     style={{
                                                         padding:'7px 14px', borderRadius:9, border:'none', fontSize:12, fontWeight:700,
                                                         background:`linear-gradient(135deg, ${color}ee, ${color}99)`, color:'#fff',
@@ -328,7 +334,7 @@ export default function AgentInspector() {
                                 <p style={{ margin:'0 0 6px', fontSize:14, fontWeight:700, color: isDark ? '#e2e8f0' : '#1e293b' }}>No tools connected to {graphData.agentId}</p>
                                 <p style={{ margin:'0 0 14px', fontSize:12, color:sub }}>Connect a tool to start auditing this agent.</p>
                                 <button
-                                    onClick={() => sendFollowUpMessage(`Connect dropbox to ${graphData.agentId}`)}
+                                    onClick={() => runFollowUp(`Connect dropbox to ${graphData.agentId}`)}
                                     style={{
                                         padding:'9px 18px', borderRadius:10, border:'none', fontWeight:700, fontSize:13,
                                         background:'linear-gradient(135deg,#3b82f6,#6366f1)', color:'#fff',

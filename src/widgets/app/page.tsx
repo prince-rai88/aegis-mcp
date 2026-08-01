@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useTheme, useWidgetSDK } from '@nitrostack/widgets';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
 
 const ACTIONS = [
     {
@@ -68,6 +69,14 @@ export default function AegisDashboard() {
     const theme = useTheme();
     const isDark = theme === 'dark';
     const { sendFollowUpMessage } = useWidgetSDK();
+    const [notice, setNotice] = useState<string | null>(null);
+
+    const runAction = (prompt: string) => {
+        sendFollowUpMessage(prompt).catch(() => {
+            setNotice('This action needs a connected host — open this project in NitroStack Studio or a chat client to run it live.');
+            setTimeout(() => setNotice(null), 4000);
+        });
+    };
 
     const bg     = isDark ? '#020617' : '#f8fafc'; // Ultra deep dark
     const card   = isDark ? 'rgba(15, 23, 42, 0.5)' : 'rgba(255, 255, 255, 0.7)';
@@ -101,6 +110,26 @@ export default function AegisDashboard() {
                     </>
                 )}
             </div>
+
+            {/* Host-connection notice (shown when a chat action fires with no embedding host) */}
+            <AnimatePresence>
+                {notice && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        style={{
+                            position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 50,
+                            maxWidth: 420, padding: '12px 18px', borderRadius: 12,
+                            background: isDark ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.98)',
+                            border: `1px solid ${border}`, boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                            color: text, fontSize: 13, fontWeight: 500, textAlign: 'center',
+                        }}
+                    >
+                        {notice}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Scrollable Content (z-index above bg) */}
             <div style={{ position: 'relative', zIndex: 1, paddingBottom: 60 }}>
@@ -197,7 +226,7 @@ export default function AegisDashboard() {
                                     <div style={{ marginTop:'auto', paddingTop:16 }}>
                                         <motion.button
                                             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                            onClick={() => sendFollowUpMessage(a.prompt)}
+                                            onClick={() => runAction(a.prompt)}
                                             style={{
                                                 width:'100%', padding:'12px 16px', border:'none', borderRadius:12,
                                                 background: `linear-gradient(135deg, ${a.color}, ${a.color}dd)`,
