@@ -10,7 +10,7 @@ export interface PolicyRule {
     message: string;
 }
 
-// Toxic-combination rules (data, not code) — see CLAUDE.md §4.2.
+// Toxic-combination rules — plain data, not logic, so adding a rule is a one-line change.
 export const POLICY_RULES: PolicyRule[] = [
     {
         id: 'exfiltration',

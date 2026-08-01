@@ -16,7 +16,7 @@ export const TOOL_REGISTRY: Record<string, Capability[]> = {
     calendar: ['READ_PRIVATE_DATA', 'WRITE_DATA'],
 };
 
-// In-memory per-agent store of connected tool IDs. No database — see CLAUDE.md §8.
+// In-memory per-agent store of connected tool IDs — no database by design.
 const agentTools = new Map<string, Set<string>>();
 
 export function getAgentTools(agentId: string): string[] {

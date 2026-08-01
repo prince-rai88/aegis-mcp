@@ -11,7 +11,7 @@
 
 Aegis is a Model Context Protocol (MCP) server built on **NitroStack** that audits the *combined* effective permissions of an AI agent across all connected tools. It deterministically detects toxic capability combinations and data-exfiltration vectors before deployment — **at zero LLM token cost**.
 
-**🔴 Live server:** `https://aegis-6a6d76ee-teamx-srmist.app.nitrocloud.ai/mcp` — connect it to Claude, ChatGPT, or NitroStack Studio and run the demo below for real.
+**🔴 Live server:** `https://aegis-6a6d76ee-teamx-srmist.app.nitrocloud.ai/mcp` — connect it to Claude, ChatGPT, or NitroStack Studio and try the walkthrough below for real.
 
 ---
 
@@ -24,8 +24,9 @@ Aegis is a Model Context Protocol (MCP) server built on **NitroStack** that audi
 - [Tool & Capability Registry](#-tool--capability-registry)
 - [Toxic-Combination Policy Rules](#-toxic-combination-policy-rules)
 - [MCP Interface Reference](#-mcp-interface-reference)
-- [2-Minute Demo Script](#-2-minute-demo-script)
+- [Try It Yourself](#-try-it-yourself)
 - [Quickstart](#-quickstart)
+- [FAQ](#-faq)
 - [Project Structure](#-project-structure)
 
 ---
@@ -179,21 +180,21 @@ Both tables are just data (`TOOL_REGISTRY` and `POLICY_RULES`) — adding a 7th 
 
 ---
 
-## 🎬 2-Minute Demo Script
+## ▶️ Try It Yourself
 
-```
- [0:00] Connect Gmail    ──►  connect_tool(gmail)     ──►  Capabilities added, nothing alarming
- [0:20] Connect Dropbox  ──►  connect_tool(dropbox)   ──►  🔴 Exfiltration edge lights up red
- [0:40] Show the graph   ──►  get_capability_graph    ──►  Live risk graph renders (see screenshot above)
- [1:00] Explain it       ──►  explain_attack_path     ──►  Plain-English summary — the only LLM call
- [1:20] Fix it            ──►  apply_policy_fix        ──►  Risky tool disconnected, riskScore → 0
-```
+Every step below works against the live server — no local setup needed. Connect `https://aegis-6a6d76ee-teamx-srmist.app.nitrocloud.ai/mcp` to Claude (Settings → Connectors → Add custom connector) or ChatGPT (Developer Mode → Plugins → Add), or point NitroStack Studio at this repo locally, then walk through the same scenario the screenshots above were taken from:
 
-Full script with talking points and judge Q&A prep: [`DEMO.md`](DEMO.md).
+1. **Connect a tool.** *"Connect gmail to demo-agent."* → `connect_tool` fires. One tool, nothing alarming yet.
+2. **Connect a second tool.** *"Now connect dropbox to demo-agent."* → the agent can now both read private data and send it externally.
+3. **See the risk.** *"Show me its capability graph."* → `get_capability_graph` renders — the exfiltration edge is red. This step is pure deterministic rule matching: zero LLM tokens spent to catch it.
+4. **Get a plain-English explanation.** *"What does this mean?"* → `explain_attack_path` fires — the *only* step in the whole system that calls an LLM, and only because a rule already matched.
+5. **Fix it.** *"Fix it."* → `apply_policy_fix` disconnects every tool supplying the dangerous capability. The graph goes back to `riskScore: 0`.
+
+Use any `agentId` you like — it's just an in-memory key, not a real account.
 
 ---
 
-## 🚀 Quickstart
+## 🚀 Quickstart (run it locally)
 
 ```bash
 git clone https://github.com/prince-rai88/aegis-mcp.git
@@ -208,7 +209,20 @@ Verify without any GUI:
 bash scripts/test-mcp.sh
 ```
 
-Or connect to [NitroStack Studio](https://nitrostack.ai/studio) → **Add Server** → **Nitro Project** → select this folder. See [`DEMO.md`](DEMO.md) for the full walkthrough, including connecting the live deployment to Claude or ChatGPT directly.
+Or connect [NitroStack Studio](https://nitrostack.ai/studio) → **Add Server** → **Nitro Project** → select this folder, then run through the [walkthrough above](#-try-it-yourself) against your local server instead of the live one.
+
+---
+
+## ❓ FAQ
+
+**Why deterministic rules instead of having the model decide what's risky?**
+Because then the audit trail is "the model thought so." Detection here is a fixed rule table (`source capability → sink capability`), so every flag is reproducible and explainable without re-running an LLM.
+
+**Does this scale beyond 6 tools and 3 rules?**
+`TOOL_REGISTRY` and the policy rules are both just data — adding a 7th tool or a 4th rule is a one-line addition, not new logic.
+
+**What does the LLM actually do, then?**
+Only `explain_attack_path`, only after a rule has already fired, cached by `SHA-256(ruleId + sorted(viaTools))` so the same finding is never re-explained twice.
 
 ---
 
@@ -235,7 +249,6 @@ aegis-mcp/
 ├── scripts/
 │   ├── test-mcp.sh                    # Stdio JSON-RPC smoke test
 │   └── preview-widgets.html           # Local widget preview, no Studio needed
-├── DEMO.md                            # Pitch + demo script
 └── README.md
 ```
 
