@@ -1,292 +1,295 @@
 # Aegis 🛡️
 
-**A blast-radius auditor for AI agents.** Aegis is a Model Context Protocol (MCP) server built with **NitroStack** that audits the *combined* effective permissions of an AI agent across all connected tools. It deterministically detects dangerous attack paths, capability escalation, and data exfiltration risks before deployment — at **zero LLM token cost**.
+[![NitroStack Framework](https://img.shields.io/badge/Framework-NitroStack_1.0-blueviolet?style=for-the-badge&logo=typescript)](https://nitrostack.ai)
+[![MCP Server](https://img.shields.io/badge/Protocol-MCP-blue?style=for-the-badge)](https://modelcontextprotocol.io)
+[![Zero Token Core](https://img.shields.io/badge/Detector_Cost-0_Tokens-brightgreen?style=for-the-badge)](https://groq.com)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+> **A Blast-Radius Auditor for AI Agents**  
+> *Track 03: Enterprise AI & Workplace Automation — NitroStack Hackathon*
+
+Aegis is a Model Context Protocol (MCP) server built on **NitroStack** that audits the *combined* effective permissions of an AI agent across all connected tools. It deterministically detects toxic capability combinations and data exfiltration vectors before deployment — **at zero LLM token cost**.
 
 ---
 
 ## 📋 Table of Contents
 
-- [The Problem & Threat Landscape](#the-problem--threat-landscape)
-- [Key Features](#key-features)
-- [How It Works](#how-it-works)
-- [Tool & Capability Matrix](#tool--capability-matrix)
-- [Toxic Combination Rules](#toxic-combination-rules)
-- [MCP Interface Reference](#mcp-interface-reference)
-  - [Tools](#tools)
-  - [Resources](#resources)
-  - [Prompts](#prompts)
-- [Interactive UI Widgets](#interactive-ui-widgets)
-- [Getting Started](#getting-started)
-- [Deployment & Studio Integration](#deployment--studio-integration)
-- [Project Architecture](#project-architecture)
-- [License](#license)
+- [The Problem & Threat Landscape](#-the-problem--threat-landscape)
+- [System Architecture](#-system-architecture)
+- [Detection & Remediation Lifecycle](#-detection--remediation-lifecycle)
+- [Tool & Capability Registry](#-tool--capability-registry)
+- [Toxic-Combination Policy Rules](#-toxic-combination-policy-rules)
+- [MCP Interface Reference](#-mcp-interface-reference)
+- [Interactive UI Widgets](#-interactive-ui-widgets)
+- [2-Minute Hackathon Demo Script](#-2-minute-hackathon-demo-script)
+- [Quickstart & Setup](#-quickstart)
+- [Project Structure](#-project-structure)
 
 ---
 
-## 🚨 The Problem & Threat Landscape
+## 🏆 Hackathon Overview
 
-Enterprises connect AI agents to dozens of services — Gmail, Dropbox, Slack, internal SQL databases, cloud storage, and command-line execution tools. Each integration is typically evaluated and approved in isolation. **Nobody checks the cumulative capability set.**
+Enterprises connect AI agents to dozens of tools — Gmail, Dropbox, Postgres databases, Slack, filesystem execution. Each integration gets approved individually on its own merits, but **nobody audits what the agent can do when tools are combined**.
 
-This blind spot creates severe security vulnerabilities already observed in production environments:
+```
+  ┌────────────────┐        ┌────────────────┐
+  │  Dropbox MCP   │        │   Gmail MCP    │
+  │ (Read Private) │        │ (Send External)│
+  └───────┬────────┘        └───────┬────────┘
+          │                         │
+          └───────────┬─────────────┘
+                      ▼
+         ┌─────────────────────────┐
+         │      Support Agent      │
+         └────────────┬────────────┘
+                      ▼
+   🚨 TOXIC COMBINATION: DATA EXFILTRATION PATH
+```
 
-- **The Supabase MCP Leak**: An agent connected to a database with legitimate read access was steered via prompt injection to exfiltrate private records externally through secondary communication tools.
-- **`postmark-mcp` Supply-Chain Attack**: A community MCP server for email delivery silently BCC'd outgoing communications to an attacker-controlled endpoint, converting a benign tool into a covert data exfiltration pipe.
-- **Tool-Poisoning Attacks**: Malicious instructions embedded inside tool descriptions or schemas hijack agent execution without triggering traditional single-tool security alerts.
-
-> **The Core Risk**: Individually, `READ_PRIVATE_DATA` (e.g., via Postgres or Dropbox) and `SEND_EXTERNAL` (e.g., via Gmail or Slack) appear harmless. Combined on a single AI agent, they create an automated **data exfiltration vector**. Aegis catches these toxic combinations *before* agents are deployed.
+> [!WARNING]
+> - `READ_PRIVATE_DATA` (Dropbox) + `SEND_EXTERNAL` (Gmail) = 🔴 **Data Exfiltration Path**
+> - `READ_PRIVATE_DATA` (Postgres) + `WRITE_PUBLIC` (Slack) = 🟠 **Public Leak Path**
+> - `DELETE_DATA` (Postgres) + `EXECUTE` (Filesystem) = 🟠 **Destructive Automation Vector**
 
 ---
 
-## ✨ Key Features
+## 📐 System Architecture
 
-- **⚡ Zero-Token Deterministic Core**: Evaluates capability sets and detects toxic paths entirely in TypeScript. No LLM tokens spent during policy analysis.
-- **🎯 Dynamic Capability Unioning**: Computes the real-time effective permission boundary as tools are attached or removed from an agent.
-- **📊 Live Interactive Widgets**: Renders dynamic, interactive React Flow graphs (`capability-graph`) and threat notification lists (`attack-path-alert`).
-- **💡 Smart LLM Explanations**: Uses Groq (`llama-3.1-8b-instant`) **only** when an active threat is detected, with SHA-256 hash caching to eliminate redundant LLM calls.
-- **🛠️ Automated One-Click Remediation**: Instantly isolates and disconnects sink tools (`apply_policy_fix`) to eliminate active attack vectors.
-- **🔐 OAuth 2.1 Guarded**: Protects tool registration endpoints using NitroStack's extensible `OAuthGuard`.
-
----
-
-## ⚙️ How It Works
-
-Aegis evaluates tool connection requests, computes the aggregate union of granted capabilities, checks against a predefined matrix of toxic policy rules, and exposes live interactive widgets directly to chat host environments (NitroStudio, ChatGPT, Claude Desktop).
+The high-level system architecture of Aegis demonstrates host integration, zero-token deterministic policy matching, interactive Next.js widget rendering, and cached LLM explanations:
 
 ```mermaid
-flowchart LR
-    subgraph Host["Chat Host (ChatGPT / Claude / NitroStudio)"]
-        User["User: \"Connect Dropbox to support-agent\""]
+flowchart TD
+    subgraph Host["Chat Host / Client"]
+        Client["User / AI Agent Host\n(NitroStudio, ChatGPT, Claude)"]
     end
 
-    User -->|MCP Tool Call| Server["Aegis MCP Server\n(NitroStack Framework)"]
-
-    subgraph Core["Aegis Engine (0 Tokens)"]
-        direction TB
-        Registry["TOOL_REGISTRY\n(Tools -> Granted Caps)"]
-        Store["In-Memory Store\n(Per-Agent Connected Tools)"]
-        Detector["Attack Path Detector\n(Source -> Sink Policy Rules)"]
-        Registry --> Store --> Detector
+    subgraph MCP["Aegis MCP Server (NitroStack)"]
+        Guard["OAuth 2.1 Guard\n(OAuthGuard)"]
+        Tools["Governance Tools Controller\n(connect_tool, get_capability_graph, apply_policy_fix)"]
+        Resources["Resource Server\n(aegis://policies)"]
+        Prompts["Prompt Controller\n(explain_attack_path)"]
+        
+        Guard --> Tools
     end
 
-    Server --> Core
-    Detector -->|Threat Found| Widgets["Interactive Widgets\n(capability-graph / attack-path-alert)"]
-    Widgets -->|Red Danger Edge| Fix["apply_policy_fix\n(Disconnects Sink Tools)"]
-    Detector -->|Cache Miss on Threat| Groq["Groq API\n(Llama 3.1 8B Explanation)"]
-    Groq --> Widgets
-    Fix --> Detector
+    subgraph Engine["Deterministic Engine (0 Tokens)"]
+        Registry["Tool Capability Registry\n(gmail, dropbox, postgres, etc.)"]
+        Store["Per-Agent Connected Tool Store\n(In-Memory Map)"]
+        Union["Capability Union Computation\n(getEffectiveCapabilities)"]
+        Detector["Policy Rules Matcher\n(detectAttackPaths)"]
+
+        Registry --> Store
+        Store --> Union
+        Union --> Detector
+    end
+
+    subgraph UI["NitroStack Interactive Widgets"]
+        GraphWidget["capability-graph Widget\n(React Flow / Radial Graph)"]
+        AlertWidget["attack-path-alert Widget\n(Severity Alerts & Fix Action)"]
+    end
+
+    subgraph LLM["Groq Explanation Layer"]
+        Groq["Groq Llama 3.1 8B\n(SHA-256 Cached Response)"]
+    end
+
+    Client -->|STDIO / SSE JSON-RPC| Guard
+    Tools --> Engine
+    Detector -->|Risk Score & Edges| GraphWidget
+    Detector -->|Threat Path List| AlertWidget
+    Prompts -->|Cache Miss on Path| Groq
+    Groq -->|Plain English Finding| Client
+    AlertWidget -->|One-Click Fix Trigger| Tools
 ```
 
 ---
 
-## 🗺️ Tool & Capability Matrix
+## 🔄 Detection & Remediation Lifecycle
 
-Aegis maintains an authoritative mapping of third-party tools to their underlying privilege levels:
+This sequence flowchart details the lifecycle from initial tool connection to automated attack path remediation:
 
-| Tool ID | Granted Capabilities | Privilege Level |
-|---|---|---|
-| `gmail` | `READ_PRIVATE_DATA`, `SEND_EXTERNAL` | High |
-| `dropbox` | `READ_PRIVATE_DATA`, `WRITE_DATA`, `SEND_EXTERNAL` | High |
-| `postgres` | `READ_PRIVATE_DATA`, `WRITE_DATA`, `DELETE_DATA` | Critical |
-| `slack` | `WRITE_PUBLIC`, `SEND_EXTERNAL` | Medium |
-| `filesystem` | `READ_PRIVATE_DATA`, `WRITE_DATA`, `EXECUTE` | Critical |
-| `calendar` | `READ_PRIVATE_DATA`, `WRITE_DATA` | Low |
+```mermaid
+flowchart LR
+    A["1. User connects Gmail"] -->|connect_tool| B["Capability: READ_PRIVATE_DATA + SEND_EXTERNAL"]
+    B --> C["Status: 🟢 SAFE (Risk Score: 0.0)"]
+    C --> D["2. User connects Dropbox"]
+    D -->|connect_tool| E["Capability: + WRITE_DATA"]
+    E --> F["Detector: Checks Policy Matrix"]
+    F -->|Match: READ_PRIVATE_DATA + SEND_EXTERNAL| G["🚨 EXFILTRATION PATH DETECTED!"]
+    G --> H["3. Render Widgets"]
+    H -->|get_capability_graph| I["Graph Edge turns RED (Risk Score: 1.0)"]
+    H -->|explain_attack_path| J["Groq LLM: Plain English Summary"]
+    I --> K["4. Remediation"]
+    K -->|apply_policy_fix| L["Disconnect Sink Tool (Gmail/Dropbox)"]
+    L --> M["Status Cleared: 🟢 SAFE (Risk Score: 0.0)"]
+```
 
 ---
 
-## 🛡️ Toxic Combination Rules
+## 🚨 Real-World Threat Vectors
 
-Aegis evaluates capability pairs (`Source` → `Sink`) to detect architectural threat paths:
+Aegis addresses emerging vulnerability classes documented in production MCP environments:
 
-| Rule ID | Source Capability | Sink Capability | Severity | Risk Score Weight | Description |
-|---|---|---|---|---|---|
-| `exfiltration` | `READ_PRIVATE_DATA` | `SEND_EXTERNAL` | **Critical** | `1.0` | Agent can read confidential data AND transmit it to an external network. |
-| `public-leak` | `READ_PRIVATE_DATA` | `WRITE_PUBLIC` | **High** | `0.6` | Agent can read private records AND publish them to public channels. |
-| `destructive` | `DELETE_DATA` | `EXECUTE` | **High** | `0.6` | Agent can delete data stores AND execute unvalidated arbitrary code. |
+> [!IMPORTANT]
+> - **The Supabase MCP Leak**: An agent connected to a database with legitimate read access was steered via prompt injection to exfiltrate private records through external communication tools.
+> - **`postmark-mcp` Supply-Chain Attack**: A community MCP server for transactional email silently BCC'd outgoing messages to an attacker-controlled endpoint.
+> - **Tool-Poisoning Attacks**: Malicious instructions hidden inside a tool's description hijack agent behavior without calling an explicitly malicious endpoint.
 
-*Overall agent risk score is calculated as `min(1.0, sum(severity_weights))`.*
+---
+
+## 🛠️ Tool & Capability Registry
+
+Aegis tracks capabilities across standard enterprise tools:
+
+| Tool Icon | Tool ID | Granted Capabilities | Risk Profile |
+|:---:|---|---|:---:|
+| 📧 | `gmail` | `READ_PRIVATE_DATA`, `SEND_EXTERNAL` | 🟠 High |
+| 📦 | `dropbox` | `READ_PRIVATE_DATA`, `WRITE_DATA`, `SEND_EXTERNAL` | 🟠 High |
+| 🗄️ | `postgres` | `READ_PRIVATE_DATA`, `WRITE_DATA`, `DELETE_DATA` | 🔴 Critical |
+| 💬 | `slack` | `WRITE_PUBLIC`, `SEND_EXTERNAL` | 🟡 Medium |
+| 💻 | `filesystem` | `READ_PRIVATE_DATA`, `WRITE_DATA`, `EXECUTE` | 🔴 Critical |
+| 📅 | `calendar` | `READ_PRIVATE_DATA`, `WRITE_DATA` | 🟢 Low |
+
+---
+
+## 🎯 Toxic-Combination Policy Rules
+
+| Rule ID | Source Capability | Sink Capability | Severity | Policy Violation Description |
+|---|---|---|:---:|---|
+| `exfiltration` | `READ_PRIVATE_DATA` | `SEND_EXTERNAL` | 🔴 **Critical** | Agent can read private data AND transmit it externally. |
+| `public-leak` | `READ_PRIVATE_DATA` | `WRITE_PUBLIC` | 🟠 **High** | Agent can read private records AND post them publicly. |
+| `destructive` | `DELETE_DATA` | `EXECUTE` | 🟠 **High** | Agent can delete data AND execute unvalidated arbitrary code. |
 
 ---
 
 ## 🔌 MCP Interface Reference
 
-### Tools
+### 1. Tools 🛠️
 
-Aegis exposes 4 core MCP tools via `@nitrostack/core`:
+- **`connect_tool`**: Connects a tool (`gmail`, `dropbox`, `postgres`, `slack`, `filesystem`, `calendar`) to an agent. Guarded by `OAuthGuard`.
+- **`get_capability_graph`**: Mapped to `@Widget('capability-graph')`. Returns graph nodes, danger edges, active attack paths, and risk score.
+- **`detect_attack_paths`**: Mapped to `@Widget('attack-path-alert')`. Runs the deterministic rule engine and returns threat path summaries.
+- **`apply_policy_fix`**: Remediates a detected attack path by removing the tool(s) supplying the sink capability.
 
-#### 1. `connect_tool`
-- **Description**: Connects a third-party tool to an agent and computes the updated effective capability set. Protected by `OAuthGuard`.
-- **Input Schema**:
-  ```json
-  {
-    "agentId": "support-agent",
-    "toolId": "dropbox"
-  }
-  ```
-- **Response**: Returns `connectedTools` list and `effectiveCapabilities`.
+### 2. Resources 📄
 
-#### 2. `get_capability_graph`
-- **Description**: Generates the complete graph structure for an agent. Mapped to `@Widget('capability-graph')`.
-- **Input Schema**:
-  ```json
-  {
-    "agentId": "support-agent"
-  }
-  ```
-- **Response**: Returns `nodes`, `edges` (with `danger: true` flags), `attackPaths`, and `riskScore`.
+- **`aegis://policies`**: Exposes the toxic-combination policy rules matrix as JSON (`application/json`).
 
-#### 3. `detect_attack_paths`
-- **Description**: Executes the deterministic toxic-combination detector. Mapped to `@Widget('attack-path-alert')`.
-- **Input Schema**:
-  ```json
-  {
-    "agentId": "support-agent"
-  }
-  ```
-- **Response**: Returns an array of detected attack paths, severity levels, and current `riskScore`.
+### 3. Prompts 💬
 
-#### 4. `apply_policy_fix`
-- **Description**: Remediates an active attack path by disconnecting the tools supplying the dangerous sink capability.
-- **Input Schema**:
-  ```json
-  {
-    "agentId": "support-agent",
-    "ruleId": "exfiltration"
-  }
-  ```
-- **Response**: Returns the refreshed, risk-cleared capability graph.
+- **`explain_attack_path`**: Accepts `agentId` and `ruleId`. Generates plain-English security findings using Groq (`llama-3.1-8b-instant`), cached by SHA-256 hash.
 
 ---
 
-### Resources
+## 🎨 Interactive Widgets
 
-#### `aegis://policies`
-- **Name**: Aegis Policies
-- **MIME Type**: `application/json`
-- **Description**: Exposes the active policy rules matrix used for toxic capability detection.
+Aegis includes built-in Next.js React widgets rendered directly inside NitroStack Studio or MCP-compatible interfaces:
 
----
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 🛡️ Aegis Capability Graph                     Risk Score: 0.85│
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│         [ Dropbox ] ──(read private)──► ( READ_PRIVATE )    │
+│                                               │             │
+│                                           (exfiltration)    │
+│                                               ▼             │
+│         [ Gmail ]   ──(send external)─► ( SEND_EXTERNAL )   │
+│                                                             │
+│ 🔴 ALERT: Agent can read private data AND send externally   │
+│ [ 🛠️ One-Click Policy Fix ]                                │
+└─────────────────────────────────────────────────────────────┘
+```
 
-### Prompts
-
-#### `explain_attack_path`
-- **Name**: `explain_attack_path`
-- **Arguments**: `agentId` (string, required), `ruleId` (string, required)
-- **Description**: Translates complex security findings into clear, non-technical executive summaries using Groq (`llama-3.1-8b-instant`). Responses are cached by a SHA-256 hash of `ruleId + sorted(viaTools)` to minimize API overhead.
-
----
-
-## 🎨 Interactive UI Widgets
-
-Aegis includes Next.js frontend widgets designed for real-time visualization within MCP-compliant canvas interfaces:
-
-1. **Capability Graph Widget** (`capability-graph`):
-   - Interactive React Flow radial graph showing Agent, Tool, and Capability nodes.
-   - Highlights active attack paths with **animated red edges**.
-   - Displays live risk score indicators (`0.00` to `1.00`).
-
-2. **Attack Path Alert Widget** (`attack-path-alert`):
-   - Severity-coded threat notifications (**Critical** / **High** / **Medium**).
-   - Lists specific contributing tools (`viaTools`).
-   - Provides a one-click automated remediation trigger (`apply_policy_fix`).
+1. **`capability-graph`**: Radial/force graph visualization showing agent, tools, and capability nodes. Danger edges display in **red**.
+2. **`attack-path-alert`**: Threat notification card highlighting active policy violations, affected tools, and a one-click **Fix** button.
 
 ---
 
-## 🚀 Getting Started
+## 🎬 2-Minute Hackathon Demo Script
+
+```
+ [0:00] Connect Gmail    ──►  connect_tool(gmail)       ──►  Capabilities added cleanly
+ [0:40] Connect Dropbox  ──►  connect_tool(dropbox)     ──►  🔴 Exfiltration Edge lights up Red!
+ [1:00] Explain Path     ──►  explain_attack_path       ──►  Plain-English summary (Groq Llama 3.1 8B)
+ [1:20] One-Click Fix    ──►  apply_policy_fix          ──►  Sink tool disconnected (Risk Score = 0)
+```
+
+1. **Connect Tool 1**: *"Connect Gmail to support-agent"* → `connect_tool` fires, granting permissions cleanly.
+2. **Connect Tool 2 (The Aha Moment)**: *"Now connect Dropbox to support-agent"* → `connect_tool` fires.
+3. **View Graph**: *"Show capability graph"* → `get_capability_graph` renders widget with a **red animated exfiltration edge**.
+4. **Explain Finding**: *"What does this mean?"* → `explain_attack_path` generates plain-English explanation via Groq.
+5. **One-Click Fix**: Click **Fix** → `apply_policy_fix` disconnects the risky sink tool and clears the risk score to `0`.
+
+---
+
+## 🚀 Quickstart
 
 ### Prerequisites
 
-- **Node.js**: v18.0.0 or higher
-- **npm**: v9.0.0 or higher
-- **Groq API Key**: Free key from [console.groq.com](https://console.groq.com) *(Required only for `explain_attack_path` prompt explanations)*
+- Node.js 18+
+- Groq API Key (Free at [consolegroq.com](https://console.groq.com))
 
-### Installation & Setup
+### Local Setup
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/prince-rai88/aegis-mcp.git
-   cd aegis-mcp
-   ```
+```bash
+git clone https://github.com/prince-rai88/aegis-mcp.git
+cd aegis-mcp
+npm install
+cp .env.example .env
+```
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+Add your `GROQ_API_KEY` to `.env`:
+```env
+GROQ_API_KEY=gsk_your_groq_key
+```
 
-3. **Configure Environment Variables**:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` and supply your Groq API key:
-   ```env
-   GROQ_API_KEY=gsk_your_groq_api_key_here
-   ```
+Run the development server:
+```bash
+npm run dev
+```
 
-4. **Run Development Server**:
-   ```bash
-   npm run dev
-   ```
+Run the terminal smoke test (no GUI required):
+```bash
+bash scripts/test-mcp.sh
+```
 
-5. **Run Terminal Smoke Test**:
-   Execute the automated stdio JSON-RPC test script to verify server initialization without a GUI:
-   ```bash
-   bash scripts/test-mcp.sh
-   ```
+### Connect to NitroStack Studio
+
+Open [NitroStack Studio](https://nitrostack.ai/studio) → **Add Server** → **Nitro Project** → select `aegis-mcp`.
 
 ---
 
-## 🌐 Deployment & Studio Integration
-
-### Connecting to NitroStack Studio
-
-1. Launch [NitroStack Studio](https://nitrostack.ai/studio).
-2. Click **Add Server** → **Nitro Project**.
-3. Point Studio to your local `aegis-mcp` directory.
-4. Test tool execution directly in the App Canvas.
-
-### Deploying to NitroCloud
-
-1. Sign in to [NitroCloud Console](https://nitrostack.ai).
-2. Create a new Nitrostack App `aegis-mcp`.
-3. Navigate to **MCP** → **Deployments** → **Deploy from GitHub**.
-4. Select repository `prince-rai88/aegis-mcp` and branch `main`.
-5. Enable **Auto-Deploy** and click **Deploy**.
-6. Copy your generated SSE Service URL (e.g., `https://aegis-mcp.nitrostack.app/sse`).
-
----
-
-## 📁 Project Architecture
+## 📁 Project Structure
 
 ```
 aegis-mcp/
 ├── src/
-│   ├── index.ts                      # App entry point
-│   ├── app.module.ts                 # Main NitroStack app module
+│   ├── app.module.ts                 # NitroStack Root Module
+│   ├── index.ts                      # Server bootstrap
 │   ├── modules/
-│   │   └── governance/               # Core Security Governance Module
-│   │       ├── capability.ts         # Capability types, tool registry & per-agent store
-│   │       ├── detector.ts           # Zero-token deterministic toxic path detector
-│   │       ├── policies.ts           # Policy rule definitions & risk scoring
-│   │       ├── oauth.guard.ts        # OAuth 2.1 authentication guard
-│   │       ├── governance.tools.ts   # Governance MCP Tools (@Tool, @Widget)
-│   │       ├── governance.resources.ts# Aegis Policy Resources (@Resource)
-│   │       ├── governance.prompts.ts  # Groq-powered Explanations (@Prompt)
-│   │       └── governance.module.ts  # Governance module definition
-│   └── widgets/                      # Next.js Frontend Widgets
+│   │   └── governance/               # Security Governance Engine
+│   │       ├── capability.ts         # Capability definitions & tool registry
+│   │       ├── detector.ts           # 0-token deterministic attack detector
+│   │       ├── policies.ts           # Toxic-combination policy rules
+│   │       ├── oauth.guard.ts        # NitroStack OAuth Guard
+│   │       ├── governance.tools.ts   # Governance MCP Tools
+│   │       ├── governance.resources.ts# Policy Resource (aegis://policies)
+│   │       ├── governance.prompts.ts  # Groq explanation prompt
+│   │       └── governance.module.ts  # Governance module registration
+│   └── widgets/                      # NitroStack Interactive Widgets
 │       ├── app/
-│       │   ├── capability-graph/     # React Flow dynamic capability graph
-│       │   └── attack-path-alert/    # Severity threat alert list widget
-│       ├── package.json              # Widget dependencies
-│       └── widget-manifest.json      # NitroStack widget registration manifest
+│       │   ├── capability-graph/     # Capability Graph UI Widget
+│       │   └── attack-path-alert/    # Attack Path Alert UI Widget
+│       └── widget-manifest.json      # NitroStack Widget Manifest
 ├── scripts/
-│   └── test-mcp.sh                   # Stdio JSON-RPC smoke test script
-├── CLAUDE.md                         # Internal development & team architecture guide
-├── DEMO.md                           # Step-by-step hackathon demo script
-├── package.json                      # Project dependencies & scripts
-└── tsconfig.json                     # TypeScript compiler configuration
+│   └── test-mcp.sh                   # Stdio JSON-RPC smoke test
+├── CLAUDE.md                         # Architecture & team guidelines
+├── DEMO.md                           # Hackathon presentation walkthrough
+└── README.md                         # Project documentation
 ```
 
 ---
 
-## 📄 License
+## 📜 License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT](LICENSE)
