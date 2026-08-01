@@ -1,65 +1,89 @@
-# Aegis — 2-Minute Demo Script
+# Aegis — Pitch & Demo Script
+
+## Problem Statement
+
+Enterprises are connecting AI agents to more tools every week — Gmail, Dropbox, Slack, internal databases —
+and each integration gets approved on its own merits. Nobody looks at what the agent can do once every
+approved permission is added *together*. That blind spot isn't theoretical: it's how the Supabase MCP leak
+happened, how a compromised `postmark-mcp` package started silently BCC'ing every email it sent to an
+attacker, and how "tool-poisoning" attacks hide malicious instructions inside a tool's own metadata.
+Individually-reasonable permissions — "read a database," "send an email" — combine into a data-exfiltration
+path, and nothing in the stack today catches that combination before it's exploited. Access reviews audit
+tools one at a time; none of them compute the union.
+
+## Solution
+
+Aegis is a blast-radius auditor for AI agents. It's an MCP server that computes an agent's *effective*
+capability set across every tool it's connected to, checks that set against a library of toxic-combination
+policy rules, and flags the result — instantly, deterministically, at zero LLM cost. When a dangerous
+combination appears (e.g. "can read private data" + "can send external"), Aegis renders it as a live risk
+graph with the dangerous path highlighted in red, explains the finding in plain English for a non-technical
+reviewer (the *only* step that touches an LLM — and only after detection, cached, cheap), and remediates it
+in one click by disconnecting the offending tool. It's a security layer that scales with how many tools an
+agent has, instead of one more manual review nobody has time to run.
+
+---
 
 ## Setup (before you're on stage)
 
-1. Deploy to NitroCloud (see below) or have `npm run dev` + NitroStack Studio open and connected to this
-   project — either works, Studio is the fallback if the live deployment isn't ready.
-2. Have the demo agent in a clean state — if you've been testing, either restart the server (in-memory
-   state resets) or just pick a fresh `agentId` you haven't used before.
-3. Confirm `GROQ_API_KEY` is set — `explain_attack_path` needs it for the plain-English explanation beat.
+1. `npm run dev` running in a terminal, **started before** you open/connect NitroStack Studio (widgets need
+   the dev server up first — reconnect the project in Studio if you started dev after connecting).
+2. Studio → confirm you're on the **Tools** panel with `aegis-mcp` showing "Connected."
+3. Pick a **fresh `agentId`** you haven't used in testing — e.g. `demo-agent` — clean slate, no surprises.
+4. Confirm `GROQ_API_KEY` is set — `explain_attack_path` needs it for the plain-English beat.
+5. One dry run through the exact steps below, right before you go on, so you're not typing IDs live for the
+   first time under pressure.
 
-## The script (~2 minutes)
+## The script (~90 seconds, 5 beats)
 
-**[0:00 – 0:20] The problem**
-> "Enterprises connect AI agents to dozens of tools — Gmail, Dropbox, internal databases. Each one gets
-> approved individually. Nobody looks at what the agent can do once you add them *together*. That's exactly
-> how the Supabase MCP leak happened, and how a compromised `postmark-mcp` package started silently
-> BCC'ing every email it sent. Individually-reasonable permissions, combined into an exfiltration path."
+**Beat 1 — the hook (15s)**
+> "Enterprises connect AI agents to dozens of tools. Each one gets approved individually — nobody checks
+> what the agent can do once you add them *together*. That's exactly how the Supabase MCP leak happened."
 
-**[0:20 – 0:40] Connect the first tool**
-- In chat: *"Connect Gmail to the support agent."*
-- Tool fires: `connect_tool({agentId: "support-agent", toolId: "gmail"})`
-- Nothing alarming yet — one tool, two capabilities.
+**Beat 2 — build the risk, live (20s)**
+- `connect_tool` → `{"agentId": "demo-agent", "toolId": "gmail"}` → Execute. *"One tool, nothing alarming."*
+- `connect_tool` → `{"agentId": "demo-agent", "toolId": "dropbox"}` → Execute.
 
-**[0:40 – 1:00] Connect the second tool — the graph turns red**
-- In chat: *"Now connect Dropbox to the support agent."*
-- Tool fires: `connect_tool({agentId: "support-agent", toolId: "dropbox"})`
-- Immediately follow with: *"Show me its capability graph."*
-- `get_capability_graph` renders — **the exfiltration edge lights up red**: the agent can now read
-  private data (Dropbox) and send it externally (Gmail). This is the visual "aha" moment of the demo.
+**Beat 3 — the visual payoff (20s)**
+- `get_capability_graph` → `{"agentId": "demo-agent"}` → Execute.
+- Point at the **red exfiltration edge**: *"It can now read private data and send it externally. Zero LLM
+  tokens spent to catch that — pure deterministic rule matching."*
 
-**[1:00 – 1:20] Explain it in plain English**
-- In chat: *"What does this mean?"*
-- `explain_attack_path` fires — Groq (Llama 3.1 8B) turns the detected `exfiltration` rule into a
-  one-sentence, non-technical explanation. Point out: **detection itself spent zero tokens** — the graph
-  turning red was pure deterministic rule-matching; the LLM is only narrating a finding that already
-  happened.
+**Beat 4 — plain English, then the fix (25s)**
+- `explain_attack_path` → `{"agentId": "demo-agent", "ruleId": "exfiltration"}` → Execute.
+  *"This is the only place we spend a token — narrating a finding that already happened, not making it."*
+- `apply_policy_fix` → `{"agentId": "demo-agent", "ruleId": "exfiltration"}` → Execute.
+  *"Graph goes clean. One click, and it's auditable — a logged deterministic action, not 'the AI decided.'"*
 
-**[1:20 – 1:40] Fix it with one click**
-- Click **Fix** on the attack-path card (or say *"fix it"* to trigger `apply_policy_fix`).
-- Graph re-renders clean — `riskScore: 0`, no active attack paths. The risky tool access is gone, and
-  the fix is auditable: it's not "the AI decided," it's a deterministic remediation you can log.
+**Beat 5 — the close (10s)**
+> "Aegis computes an agent's real blast radius across every connected tool, catches the toxic combination
+> before it's exploited, explains it in plain English, and fixes it in one click. No LLM in the detection
+> loop — deterministic, fast, and auditable."
 
-**[1:40 – 2:00] The pitch**
-> "That's Aegis: it computes an agent's *effective* blast radius across every tool it's connected to,
-> catches the toxic combinations before they're exploited, explains them in plain English, and fixes them
-> in one click — all without an LLM in the detection loop. Deterministic, fast, and auditable."
+## If you get asked...
 
-## Deploying to NitroCloud (for the live Service URL)
+- **"Why not just have the AI decide what's risky?"** — Because then the audit trail is "the model thought
+  so." Aegis's detection is a fixed rule table (`source capability → sink capability`), so every flag is
+  reproducible and explainable without re-running an LLM.
+- **"Does this scale beyond 6 tools?"** — `TOOL_REGISTRY` and the policy rules are both just data — adding a
+  7th tool or a 4th rule is a one-line addition, not new logic.
+- **"What's the LLM actually doing?"** — Only `explain_attack_path`, only after a rule already fired,
+  cached by `hash(ruleId + sorted(viaTools))` so the same finding is never re-explained twice.
 
-1. Sign in to [cloud.nitrostack.ai](https://cloud.nitrostack.ai).
-2. **Create New App** → name it `aegis-mcp`.
-3. **MCP → Deployments → Deploy from GitHub** → authorize → connect `prince-rai88/aegis-mcp`.
-4. Branch: `main` (once this work is merged there).
-5. Add environment variable **`GROQ_API_KEY`** in the app's settings.
-6. **Enable Auto-Deploy → Deploy.** Copy the Service URL once live — every push to `main` redeploys.
-7. To connect a real chat client: point ChatGPT (Developer Mode → Plugins → Add → Server URL) or Claude at
-   `{serviceUrl}/mcp` and run the script above for real.
+## Deploying to NitroCloud (for a live Service URL instead of Studio)
 
-## Fallback if NitroCloud isn't ready
+1. [cloud.nitrostack.ai](https://cloud.nitrostack.ai) → your Aegis app → **MCP** module → **Open MCP**.
+2. Deploy from GitHub → authorize → connect `prince-rai88/aegis-mcp`, branch `main`.
+3. Add environment variable **`GROQ_API_KEY`**.
+4. Enable auto-deploy → Deploy → copy the **Service URL**.
+5. Connect a real chat client: ChatGPT (Developer Mode → Plugins → Add → Server URL) or Claude, pointed at
+   `{serviceUrl}/mcp`, then run the same 5 beats above for real — this is the strongest version of the demo
+   if it's ready in time, since the widget renders inline in an actual chat conversation.
 
-Everything above also works entirely locally:
-- `npm run dev` + NitroStack Studio (*Add Server → Nitro Project* → this folder) gives the same tool calls
-  and widget rendering without needing a deployment.
-- `bash scripts/test-mcp.sh` proves every tool works end-to-end from a terminal, no GUI, if you just need to
-  demonstrate correctness rather than the visual flow.
+## Fallback if Studio or NitroCloud isn't cooperating live
+
+- `bash scripts/test-mcp.sh` — proves every tool works end-to-end from a terminal in ~10 seconds. Not
+  visual, but zero risk of a live connection failing on you.
+- `scripts/preview-widgets.html` (open directly in a browser, needs `npm run dev` running) — shows the real
+  rendered graph/alert widgets with real data, no Studio dependency, if you just need the visual without
+  the click-through.
