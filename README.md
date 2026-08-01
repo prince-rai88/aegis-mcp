@@ -178,6 +178,23 @@ Both tables are just data (`TOOL_REGISTRY` and `POLICY_RULES`) — adding a 7th 
 **Prompt**
 - **`explain_attack_path`** — takes `agentId` + `ruleId`, returns a plain-English explanation via Groq (`llama-3.1-8b-instant`). Only fires on an already-detected path, cached by `SHA-256(ruleId + sorted(viaTools))` — this is the *only* step in the entire system that spends a token.
 
+### MCP surface map
+
+```mermaid
+flowchart LR
+    Agent(("🛡️ Aegis"))
+
+    Agent --> T1["🔧 connect_tool"]
+    Agent --> T2["🔧 get_capability_graph"]
+    Agent --> T3["🔧 detect_attack_paths"]
+    Agent --> T4["🔧 apply_policy_fix"]
+    Agent --> R1["📄 aegis://policies"]
+    Agent --> P1["💬 explain_attack_path"]
+
+    T2 -.renders.-> W1["🎨 capability-graph widget"]
+    T3 -.renders.-> W2["🎨 attack-path-alert widget"]
+```
+
 ---
 
 ## ▶️ Try It Yourself
